@@ -6,6 +6,17 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 **PriceHub** is a SaaS platform for centralizing supplier price lists. This repository currently contains **documentation and planning only** — no application code has been written yet. The `mds/` directory holds all architectural and feature docs generated from `idea.md`.
 
+## Development Order
+
+Follow `ordenDesarrollo.md` strictly. Build in this sequence:
+
+1. **DB + API (auth + suppliers)** — docker-compose, migrations, auth and supplier endpoints
+2. **Document Processor (Python)** — Excel/CSV parser first (most reliable), test in isolation
+3. **Import Pipeline (API + Python + Redis)** — upload → BullMQ → Python → products/prices in DB. Core product validation.
+4. **Remaining API** — catalog, price changes, favorites, markup, purchases, notifications. All testeable without frontend.
+5. **Frontend** — with stable API: auth, dashboard, product listing, file upload, purchase lists, notifications
+6. **PDF parser** — added last to Document Processor because it's more fragile and needs iteration
+
 ## Development Commands
 
 Once the monorepo is initialized with pnpm workspaces:

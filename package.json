@@ -1,0 +1,19 @@
+{
+  "name": "pricehub",
+  "private": true,
+  "packageManager": "pnpm@9.15.4",
+  "scripts": {
+    "dev": "pnpm --filter api dev",
+    "build": "pnpm --filter api build",
+    "lint": "eslint . --ext .ts,.tsx",
+    "test": "pnpm --filter api test",
+    "test:e2e": "pnpm --filter api test:e2e"
+  },
+  "devDependencies": {
+    "@typescript-eslint/eslint-plugin": "^7.0.0",
+    "@typescript-eslint/parser": "^7.0.0",
+    "eslint": "^8.57.0",
+    "prettier": "^3.2.0",
+    "typescript": "^5.4.0"
+  }
+}
