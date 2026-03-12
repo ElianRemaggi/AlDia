@@ -355,6 +355,171 @@ No requiere autenticación.
 
 ---
 
+## Price Lists e Import (Paso 3)
+
+Estos endpoints aún no están implementados. Se construyen en el Paso 3.
+
+| Método | Ruta | Auth | Descripción |
+|--------|------|------|-------------|
+| POST   | `/suppliers/:supplierId/price-lists/upload` | Bearer | Subir archivo e iniciar importación |
+| GET    | `/suppliers/:supplierId/price-lists` | Bearer | Listar price lists del supplier |
+| GET    | `/suppliers/:supplierId/price-lists/:id` | Bearer | Detalle de un price list |
+| GET    | `/import-jobs/:id` | Bearer | Estado de un job de importación |
+
+---
+
+### POST `/suppliers/:supplierId/price-lists/upload`
+
+Request: `multipart/form-data`
+
+| Campo | Tipo | Requerido | Descripción |
+|-------|------|-----------|-------------|
+| `file` | File | sí | Archivo (.xlsx, .xls, .csv). Máx 20MB |
+| `effective_date` | string (date) | no | Fecha desde cuando rige la lista |
+| `notes` | string | no | Nota libre |
+| `price_format` | `"decimal_point"` \| `"decimal_comma"` | no | Default: `decimal_point` |
+
+```json
+// Response 202 — Aceptado, procesando en background
+{
+  "status": "success",
+  "data": {
+    "priceListId":    "550e8400-e29b-41d4-a716-446655440000",
+    "importJobId":    "7c9e6679-7425-40de-944b-e07fc1f90ae7",
+    "status":         "pending",
+    "sourceType":     "excel",
+    "sourceFileName": "lista_precios_marzo.xlsx",
+    "versionNumber":  3,
+    "message":        "File uploaded. Processing started."
+  }
+}
+```
+
+```json
+// Response 400 — archivo inválido
+{ "status": "error", "message": "Unsupported file type. Supported: xlsx, xls, csv" }
+
+// Response 400 — archivo muy grande
+{ "status": "error", "message": "File too large. Maximum size is 20MB" }
+```
+
+---
+
+### GET `/suppliers/:supplierId/price-lists`
+
+**Query params:** `page`, `limit`, `status` (`pending` | `processed` | `failed` | `partially_processed`)
+
+```json
+// Response 200
+{
+  "status": "success",
+  "data": [
+    {
+      "id":             "uuid",
+      "supplierId":     "uuid",
+      "sourceType":     "excel",
+      "sourceFileName": "lista_precios_marzo.xlsx",
+      "status":         "processed",
+      "versionNumber":  3,
+      "effectiveDate":  "2026-03-01",
+      "uploadedAt":     "2026-03-12T10:00:00Z",
+      "processedAt":    "2026-03-12T10:00:45Z",
+      "totalItems":     150
+    }
+  ],
+  "meta": { "total": 3, "page": 1, "limit": 20, "totalPages": 1 }
+}
+```
+
+---
+
+### GET `/suppliers/:supplierId/price-lists/:id`
+
+```json
+// Response 200
+{
+  "status": "success",
+  "data": {
+    "id":             "uuid",
+    "supplierId":     "uuid",
+    "sourceType":     "excel",
+    "sourceFileName": "lista_precios_marzo.xlsx",
+    "status":         "processed",
+    "versionNumber":  3,
+    "effectiveDate":  "2026-03-01",
+    "uploadedAt":     "2026-03-12T10:00:00Z",
+    "processedAt":    "2026-03-12T10:00:45Z",
+    "notes":          null,
+    "items": [
+      {
+        "id":                   "uuid",
+        "supplierProductId":    "uuid",
+        "rawName":              "Leche Entera x 1L",
+        "unitCost":             "1500.50",
+        "currency":             "ARS",
+        "unit":                 "unidad",
+        "positionIndex":        0
+      }
+    ]
+  }
+}
+```
+
+---
+
+### GET `/import-jobs/:id`
+
+Usado por el frontend para polling del estado de una importación (cada 3-5 segundos).
+
+```json
+// Response 200 — en progreso
+{
+  "status": "success",
+  "data": {
+    "id":          "uuid",
+    "priceListId": "uuid",
+    "jobType":     "parse_document",
+    "status":      "running",
+    "startedAt":   "2026-03-12T10:00:10Z",
+    "finishedAt":  null,
+    "errorMessage": null,
+    "metaJson": {
+      "total_rows":          150,
+      "processed_rows":      87,
+      "progress_percentage": 58
+    }
+  }
+}
+
+// Response 200 — completado
+{
+  "status": "success",
+  "data": {
+    "id":           "uuid",
+    "priceListId":  "uuid",
+    "jobType":      "parse_document",
+    "status":       "completed",
+    "startedAt":    "2026-03-12T10:00:10Z",
+    "finishedAt":   "2026-03-12T10:00:45Z",
+    "errorMessage": null,
+    "metaJson": { "total_rows": 150, "processed_rows": 150, "progress_percentage": 100 }
+  }
+}
+
+// Response 200 — fallido
+{
+  "status": "success",
+  "data": {
+    "id":           "uuid",
+    "status":       "failed",
+    "errorMessage": "Column 'Precio' not found in any of the first 10 rows",
+    "finishedAt":   "2026-03-12T10:00:20Z"
+  }
+}
+```
+
+---
+
 # Document Processor — Python CLI
 
 Ubicación: `services/document-processor/`
