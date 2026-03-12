@@ -4,7 +4,8 @@ import { PriceListStatus } from './entities/price-list.entity';
 import { ImportJobStatus } from './entities/import-job.entity';
 import * as processor from './import.processor';
 
-documentProcessingWorker.on('completed', async (job, returnValue: JobResult) => {
+documentProcessingWorker.on('completed', async (job) => {
+  const returnValue = (job.returnvalue ?? {}) as JobResult;
   const { priceListId, status, parseResult, errorMessage } = returnValue;
 
   if (status === 'failed' || !parseResult) {

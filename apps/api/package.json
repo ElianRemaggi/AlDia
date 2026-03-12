@@ -16,6 +16,7 @@
     "test:coverage": "vitest run --coverage"
   },
   "dependencies": {
+    "@google-cloud/storage": "^7.19.0",
     "@pricehub/shared": "workspace:*",
     "bcrypt": "^5.1.1",
     "bullmq": "^5.71.0",
