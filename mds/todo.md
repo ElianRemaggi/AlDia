@@ -7,215 +7,228 @@
 
 ---
 
-## Phase 1: Foundation (Weeks 1-2)
+## Phase 1: Foundation ✅
 
 ### 1.1 Project Setup
-- [ ] Initialize monorepo with pnpm workspaces
-- [ ] Configure TypeScript (shared tsconfig)
-- [ ] Setup ESLint + Prettier (shared config)
-- [ ] Create `apps/web` (Next.js + Tailwind + shadcn/ui)
-- [ ] Create `apps/api` (Express + TypeScript)
-- [ ] Create `services/document-processor` (Python)
-- [ ] Create `packages/shared` (shared types and constants)
-- [ ] Setup docker-compose.yml (PostgreSQL + Redis)
-- [ ] Create `.env.example` files for all services
-- [ ] Setup .gitignore properly
+- [x] Initialize monorepo with pnpm workspaces
+- [x] Configure TypeScript (shared tsconfig)
+- [x] Setup ESLint + Prettier (shared config)
+- [ ] Create `apps/web` (Next.js + Tailwind + shadcn/ui) ← Fase F1 frontend
+- [x] Create `apps/api` (Express + TypeScript)
+- [x] Create `services/document-processor` (Python)
+- [x] Create `packages/shared` (shared types and constants)
+- [x] Setup docker-compose.yml (PostgreSQL + Redis)
+- [x] Create `.env.example` files for all services
+- [x] Setup .gitignore properly
 
 ### 1.2 Database
-- [ ] Configure TypeORM connection
-- [ ] Create initial migration with all MVP tables
-- [ ] Seed script for development data (admin user, test commerce)
-- [ ] Verify all indexes are created
+- [x] Configure TypeORM connection
+- [x] Create initial migration (commerces, users, suppliers)
+- [x] Seed script for development data (admin user, test commerce)
+- [x] Verify all indexes are created
 
 ### 1.3 Authentication
-- [ ] Implement user entity and repository
-- [ ] Password hashing with bcrypt
-- [ ] Login endpoint (POST /auth/login)
-- [ ] JWT token generation (access + refresh)
-- [ ] Auth middleware (validate token, attach user to request)
-- [ ] Role middleware (requireRole)
-- [ ] Commerce scope middleware (scopeToCommerce)
-- [ ] Refresh token endpoint
-- [ ] Logout endpoint
-- [ ] GET /auth/me endpoint
+- [x] Implement user entity and repository
+- [x] Password hashing with bcrypt
+- [x] Login endpoint (POST /auth/login)
+- [x] JWT token generation (access + refresh)
+- [x] Auth middleware (validate token, attach user to request)
+- [x] Role middleware (requireRole)
+- [x] Commerce scope middleware (scopeToCommerce)
+- [x] Refresh token endpoint
+- [x] Logout endpoint
+- [x] GET /auth/me endpoint
 - [ ] Rate limiting on auth endpoints
 
 ### 1.4 Admin Basics
-- [ ] CRUD endpoints for commerces
-- [ ] CRUD endpoints for users (admin only)
-- [ ] Input validation with zod
+- [x] CRUD endpoints for commerces (GET, POST, GET/:id, PATCH/:id)
+- [ ] CRUD endpoints for users (admin only) — GET/PATCH/DELETE /admin/users
+- [x] Input validation with zod
 
 ---
 
-## Phase 2: Supplier & Catalog Core (Weeks 3-4)
+## Phase 2: Suppliers + Document Processor
 
-### 2.1 Suppliers
-- [ ] Supplier entity, repository, service
-- [ ] CRUD endpoints for suppliers
-- [ ] Scoped to commerce_id
-- [ ] List with search and pagination
+### 2.1 Suppliers ✅
+- [x] Supplier entity, repository, service
+- [x] CRUD endpoints for suppliers (GET, POST, GET/:id, PATCH/:id, DELETE/:id)
+- [x] Scoped to commerce_id
+- [x] List with search and pagination
 
 ### 2.2 Supplier Products
-- [ ] SupplierProduct entity, repository, service
-- [ ] CRUD endpoints
-- [ ] List with filters (supplier, name, code, category)
-- [ ] Pagination and sorting
+- [ ] SupplierProduct entity + migration (Paso 3)
+- [ ] CRUD endpoints: GET /suppliers/:id/products, POST, GET/:pid, PATCH/:pid
 
 ### 2.3 File Upload
 - [ ] Multer configuration for file upload
-- [ ] Google Cloud Storage integration (upload, get signed URL)
-- [ ] File type validation (PDF, Excel, CSV)
+- [ ] Google Cloud Storage integration — `shared/storage/gcs.ts`
+- [ ] File type validation (xlsx, xls, csv)
 - [ ] File size limit (20MB)
 
-### 2.4 Import Pipeline — Infrastructure
-- [ ] BullMQ queue setup
+### 2.4 Import Pipeline — Infrastructure (Paso 3)
+- [ ] BullMQ queue setup — `modules/import/import.queue.ts`
 - [ ] Import job creation flow
-- [ ] Job status tracking endpoint
-- [ ] Python worker — Redis connection and job polling
-- [ ] Communication protocol: job payload and result format
+- [ ] Job status tracking endpoint (GET /import-jobs/:id)
+- [ ] Python worker — `services/document-processor/worker/`
+- [ ] Communication protocol documentado en `mds/import-pipeline.md`
 
-### 2.5 Parsers — Excel/CSV
-- [ ] Python: Excel parser (openpyxl + pandas)
-- [ ] Python: CSV parser (pandas)
-- [ ] Column mapping configuration per supplier
-- [ ] Normalized output format (JSON)
-- [ ] Error handling for malformed files
+### 2.5 Parsers — Excel/CSV ✅
+- [x] Python: Excel parser (openpyxl)
+- [x] Python: CSV parser (pandas + chardet)
+- [x] Column mapping configuration (auto-detect + manual)
+- [x] Normalized output format (JSON — `ParseResult`)
+- [x] Error handling for malformed files
 
-### 2.6 Parsers — PDF
+### 2.6 Parsers — PDF (Paso 6)
 - [ ] Python: PDF text extraction (pdfplumber)
 - [ ] Table detection and row extraction
-- [ ] Basic parser for common PDF table layouts
 - [ ] Handle multi-page PDFs
 
-### 2.7 Import Pipeline — Processing
-- [ ] Receive parsed data from Python worker
-- [ ] Match products to existing supplier_products
-- [ ] Create new supplier_products for unmatched rows
-- [ ] Create price_list_items (immutable)
-- [ ] Update price_list status
+### 2.7 Import Pipeline — Processing (Paso 3)
+- [ ] Segunda migración: price_lists, price_list_items, import_jobs, price_change_events, import_parse_results
+- [ ] POST /suppliers/:id/price-lists/upload
+- [ ] Node Worker events: completed / failed
+- [ ] matchOrCreateProduct (por código, luego nombre normalizado)
+- [ ] createPriceListItems (inmutables)
+- [ ] detectPriceChanges
+- [ ] generateNotifications (favoritos)
 - [ ] Store import_parse_results
 
 ---
 
-## Phase 3: Price Intelligence (Weeks 5-6)
+## Phase 3: Price Intelligence (API Paso 4)
 
 ### 3.1 Change Detection
-- [ ] Compare new price_list vs previous for same supplier
-- [ ] Create price_change_events
-- [ ] Handle edge cases: new products, removed products, unchanged prices
+- [ ] price_change_events ya creados en pipeline — endpoints de consulta
+- [ ] GET /products/:id/changes
 
 ### 3.2 Price History
 - [ ] GET /products/:id/price-history endpoint
-- [ ] Query optimization for historical data
-- [ ] Price history chart data format
+- [ ] Optimización: índice en (supplier_product_id, created_at)
 
-### 3.3 Product Listing (Enhanced)
-- [ ] Combined view: product + current price + previous price + change %
-- [ ] All filters working (search, supplier, category, price range, favorites, has_change)
-- [ ] All sort options working
-- [ ] Pagination with total count
+### 3.3 Product Listing
+- [ ] GET /products — vista cross-supplier con precio actual, cambio %, favorito
+- [ ] Filtros: search, supplier_id, category, is_favorite, has_recent_change, price range
+- [ ] Sort: name, price, change_percentage
+- [ ] Paginación
 
 ### 3.4 Favorites
-- [ ] Mark/unmark product as favorite
-- [ ] Filter by favorites
-- [ ] Favorites count in dashboard
+- [ ] POST /products/:id/favorite
+- [ ] DELETE /products/:id/favorite
+- [ ] Filtro `is_favorite` en product listing
 
 ---
 
-## Phase 4: Commerce Operations (Weeks 7-8)
+## Phase 4: Commerce Operations (API Paso 4)
 
 ### 4.1 Commerce Products
-- [ ] CRUD for internal products
-- [ ] Category assignment (free text)
-- [ ] Internal SKU support
+- [ ] commerce_products entity + migration
+- [ ] CRUD: GET /commerce-products, POST, GET/:id, PATCH/:id, DELETE/:id
 
 ### 4.2 Product Linking
-- [ ] Link commerce product to supplier product
-- [ ] Unlink
-- [ ] View all links for a commerce product
-- [ ] Compare linked products (different suppliers, same internal product)
+- [ ] POST /commerce-products/:id/links
+- [ ] DELETE /commerce-products/:id/links/:linkId
 
 ### 4.3 Markup Rules
-- [ ] CRUD for markup rules
-- [ ] Precedence logic (supplier_product > commerce_product > supplier)
-- [ ] Bulk update: set markup for all products of a supplier
-- [ ] Sale price calculation in product listing
-- [ ] Inline edit markup in product table
+- [ ] markup_rules entity + migration
+- [ ] CRUD: GET /markup-rules, POST, PATCH/:id, DELETE/:id
+- [ ] POST /markup-rules/bulk-update
+- [ ] Lógica de precedencia en product listing (supplier_product > commerce_product > supplier)
 
 ---
 
-## Phase 5: Purchase & Notifications (Weeks 9-10)
+## Phase 5: Purchase & Notifications (API Paso 4)
 
 ### 5.1 Purchase Lists
-- [ ] CRUD for purchase lists
-- [ ] Add/remove/update items
-- [ ] Group items by supplier
-- [ ] Estimated cost snapshot
-- [ ] Status transitions (draft → exported → archived)
+- [ ] purchase_lists + purchase_list_items entities + migration
+- [ ] CRUD: GET /purchase-lists, POST, GET/:id, PATCH/:id, DELETE/:id
+- [ ] POST /purchase-lists/:id/items, PATCH/:id/items/:itemId, DELETE/:id/items/:itemId
+- [ ] PATCH /purchase-lists/:id/status (draft → exported → archived)
 
 ### 5.2 WhatsApp Export
-- [ ] Generate WhatsApp-formatted text
-- [ ] Group by supplier
-- [ ] Copy-to-clipboard support in frontend
-- [ ] Optional: include/exclude prices toggle
+- [ ] GET /purchase-lists/:id/export/whatsapp
+- [ ] Formato: agrupado por proveedor, texto plano
 
 ### 5.3 Notifications
-- [ ] Notification entity and service
-- [ ] Create notifications on import completion
-- [ ] Create notifications on price change (favorites)
-- [ ] GET /notifications (paginated, filterable)
-- [ ] GET /notifications/unread-count
-- [ ] Mark as read (single and bulk)
-- [ ] Polling on frontend (30s interval)
-- [ ] Bell icon with badge in navigation
+- [ ] notifications entity + migration
+- [ ] GET /notifications, GET /notifications/unread-count
+- [ ] PATCH /notifications/:id/read, POST /notifications/mark-all-read
+- [ ] Creación automática en: import completed/failed, price change en favorito
 
 ---
 
-## Phase 6: Dashboard & Polish (Weeks 11-12)
+## Phase 6: Frontend (Paso 5)
 
-### 6.0 Admin Panel (solo visible para rol `admin`)
-- [ ] Layout/navegación separada para admins (rutas bajo `/admin`)
-- [ ] Listado de commerces con búsqueda y filtro por estado
-- [ ] Formulario para dar de alta un commerce (nombre, identificador, email, teléfono)
-- [ ] Formulario de edición de commerce
-- [ ] Activar / desactivar commerce (toggle `isActive`)
-- [ ] Listado de usuarios con filtro por rol y commerce
-- [ ] Formulario para crear usuario (nombre, email, password, rol, commerce asignado)
-- [ ] Protección de rutas: redirigir a dashboard si el usuario no es admin
+> Ver plan detallado en `mds/frontend.md`
 
-### 6.1 Dashboard
-- [ ] Summary stats endpoint
-- [ ] Recent changes section
-- [ ] Recent imports section
-- [ ] Favorite alerts section
-- [ ] Quick action buttons
+### F1 — Disponible ahora (API Paso 1 lista)
+- [ ] Setup `apps/web` (Next.js + Tailwind + shadcn/ui)
+- [ ] `lib/api/client.ts` — fetch wrapper con refresh interceptor
+- [ ] `lib/auth/` — AuthProvider, token-store, useAuth
+- [ ] `middleware.ts` — protección de rutas
+- [ ] `/login` — formulario de login
+- [ ] Layout dashboard (sidebar, header)
+- [ ] `/suppliers` — lista con búsqueda y paginación
+- [ ] `/suppliers/new` y `/suppliers/:id/edit`
+- [ ] `/suppliers/:id` — detalle
+- [ ] `/admin/commerces` — lista + toggle isActive
+- [ ] `/admin/commerces/new` y `/:id/edit`
+- [ ] `/admin/users` — lista
+- [ ] `/admin/users/new`
 
-### 6.2 Frontend Polish
-- [ ] Responsive design pass (mobile-friendly tables, navigation)
-- [ ] Loading states and skeletons
-- [ ] Empty states with helpful messages
-- [ ] Error boundaries and error pages (404, 500)
-- [ ] Toast notifications for actions
+### F2 — Tras API Paso 3 (Import Pipeline)
+- [ ] `/suppliers/:id/price-lists` — historial
+- [ ] `/suppliers/:id/price-lists/upload` — upload + ImportJobPoller
+- [ ] Toasts al completar/fallar importación
 
-### 6.3 Quality
-- [ ] Unit tests for critical business logic (change detection, markup precedence, export format)
-- [ ] API integration tests for auth flow
-- [ ] API integration tests for import pipeline
-- [ ] E2E test: upload file → see products → add to purchase list → export
-- [ ] Performance check: product listing with 1000+ products
-- [ ] Security review: auth, CORS, input validation, SQL injection prevention
+### F3 — Tras API Paso 4 (Catálogo)
+- [ ] `/products` — tabla con todos los filtros
+- [ ] Toggle favorito con optimistic update
+- [ ] `/products/:id` — detalle + gráfico historial de precios
 
-### 6.4 Deploy
+### F4 — Tras API Paso 5 (Compras + Notificaciones)
+- [ ] `/purchase-lists` — lista y creación
+- [ ] `/purchase-lists/:id` — items inline edit + export WhatsApp
+- [ ] `NotificationBell` en header con polling 30s
+- [ ] `/notifications` — centro de notificaciones
+
+### F5 — Dashboard + Polish
+- [ ] `/` — dashboard con stats reales
+- [ ] `/admin` — dashboard admin
+- [ ] Empty states en todas las páginas
+- [ ] Loading skeletons
+- [ ] Error boundaries
+- [ ] Responsive: tablas → cards en mobile
+
+---
+
+## Phase 7: Quality & Deploy
+
+### 7.1 Quality
+- [ ] Unit tests: change detection, markup precedence, export format
+- [ ] API integration tests: auth flow, import pipeline
+- [ ] E2E: upload → productos → lista de compra → export
+- [ ] Performance: product listing con 1000+ productos
+
+### 7.2 Deploy
 - [ ] Setup staging environment
-- [ ] Configure CI/CD pipeline
-- [ ] Deploy frontend to Vercel
-- [ ] Deploy backend with Docker
-- [ ] Run migrations in staging
-- [ ] Smoke test all critical flows
-- [ ] Setup monitoring (health check, Sentry, logs)
+- [ ] CI/CD pipeline
+- [ ] Frontend → Vercel
+- [ ] Backend + services → Docker (VPS o Cloud Run)
+- [ ] Migrations en staging
+- [ ] Monitoring: health check, Sentry, logs
 
 ---
 
 ## Review Notes
 
-_(Add notes here after each phase completion)_
+### Paso 1 ✅ (completado)
+- auth, commerce, supplier modules con tests
+- Migración inicial: commerces, users, suppliers
+- Pendiente menor: rate limiting en auth, DELETE /admin/users
+
+### Paso 2 ✅ (completado)
+- ExcelParser + CsvParser implementados y testeados
+- Auto-detección de headers y columnas
+- Normalización de precios ARS y decimal_point
+- Pendiente: conectar a BullMQ (Paso 3)

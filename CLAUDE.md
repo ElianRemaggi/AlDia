@@ -107,6 +107,8 @@ All detailed documentation lives in `mds/`:
 | Full DB schema | `mds/schema.md` |
 | Import pipeline detail | `mds/import-pipeline.md` |
 | All API endpoints | `mds/endpoints.md` |
+| API reference (implementada) | `mds/api-reference.md` |
+| Frontend planning detallado | `mds/frontend.md` |
 | Environment variables | `mds/env-vars.md` |
 | Development roadmap | `mds/todo.md` |
 
