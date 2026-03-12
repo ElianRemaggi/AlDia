@@ -9,6 +9,11 @@ import authRoutes from './modules/auth/auth.routes';
 import commerceRoutes from './modules/commerce/commerce.routes';
 import supplierRoutes from './modules/supplier/supplier.routes';
 import { priceListRouter, importJobRouter } from './modules/import/import.routes';
+import catalogRoutes from './modules/catalog/catalog.routes';
+import commerceProductRoutes from './modules/commerce-product/commerce-product.routes';
+import markupRoutes from './modules/markup/markup.routes';
+import purchaseRoutes from './modules/purchase/purchase.routes';
+import notificationRoutes from './modules/notification/notification.routes';
 
 const app = express();
 
@@ -29,6 +34,11 @@ app.use('/api/v1/commerces', commerceRoutes);
 app.use('/api/v1/suppliers', supplierRoutes);
 app.use('/api/v1/suppliers/:supplierId/price-lists', priceListRouter);
 app.use('/api/v1/import-jobs', importJobRouter);
+app.use('/api/v1/products', catalogRoutes);
+app.use('/api/v1/commerce-products', commerceProductRoutes);
+app.use('/api/v1/markup-rules', markupRoutes);
+app.use('/api/v1/purchase-lists', purchaseRoutes);
+app.use('/api/v1/notifications', notificationRoutes);
 
 // Error handling
 app.use(errorHandler);

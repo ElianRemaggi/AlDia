@@ -102,3 +102,100 @@ export function createImportJobFixture(overrides: Record<string, unknown> = {}) 
     ...overrides,
   };
 }
+
+export function createCommerceProductFixture(overrides: Record<string, unknown> = {}) {
+  return {
+    id: 'cp-uuid-1',
+    commerceId: 'commerce-uuid-1',
+    name: 'Test Commerce Product',
+    internalCode: null,
+    description: null,
+    category: null,
+    isActive: true,
+    createdAt: new Date('2024-01-01'),
+    updatedAt: new Date('2024-01-01'),
+    commerce: null,
+    ...overrides,
+  };
+}
+
+export function createCommerceProductSupplierLinkFixture(
+  overrides: Record<string, unknown> = {},
+) {
+  return {
+    id: 'link-uuid-1',
+    commerceId: 'commerce-uuid-1',
+    commerceProductId: 'cp-uuid-1',
+    supplierProductId: 'sp-uuid-1',
+    isFavorite: false,
+    createdAt: new Date('2024-01-01'),
+    updatedAt: new Date('2024-01-01'),
+    commerce: null,
+    commerceProduct: null,
+    supplierProduct: null,
+    ...overrides,
+  };
+}
+
+export function createMarkupRuleFixture(overrides: Record<string, unknown> = {}) {
+  return {
+    id: 'rule-uuid-1',
+    commerceId: 'commerce-uuid-1',
+    scopeType: 'supplier' as const,
+    supplierId: 'supplier-uuid-1',
+    supplierProductId: null,
+    commerceProductId: null,
+    markupPercentage: '20.00',
+    createdAt: new Date('2024-01-01'),
+    updatedAt: new Date('2024-01-01'),
+    commerce: null,
+    ...overrides,
+  };
+}
+
+export function createPurchaseListFixture(overrides: Record<string, unknown> = {}) {
+  return {
+    id: 'pl-uuid-1',
+    commerceId: 'commerce-uuid-1',
+    name: 'Test Purchase List',
+    status: 'active' as const,
+    notes: null,
+    createdAt: new Date('2024-01-01'),
+    updatedAt: new Date('2024-01-01'),
+    commerce: null,
+    items: [],
+    ...overrides,
+  };
+}
+
+export function createPurchaseListItemFixture(overrides: Record<string, unknown> = {}) {
+  return {
+    id: 'item-uuid-1',
+    purchaseListId: 'pl-uuid-1',
+    supplierProductId: 'sp-uuid-1',
+    quantity: 1,
+    unitCostSnapshot: '100.00',
+    currency: 'ARS',
+    notes: null,
+    createdAt: new Date('2024-01-01'),
+    updatedAt: new Date('2024-01-01'),
+    purchaseList: null,
+    supplierProduct: null,
+    ...overrides,
+  };
+}
+
+export function createNotificationFixture(overrides: Record<string, unknown> = {}) {
+  return {
+    id: 'notif-uuid-1',
+    commerceId: 'commerce-uuid-1',
+    type: 'import_finished' as const,
+    title: 'Test Notification',
+    message: 'Test notification message',
+    isRead: false,
+    metadataJson: null,
+    createdAt: new Date('2024-01-01'),
+    commerce: null,
+    ...overrides,
+  };
+}

@@ -41,6 +41,7 @@ documentProcessingWorker.on('completed', async (job, returnValue: JobResult) => 
 
     await processor.createPriceListItems(priceListId, parseResult.rows, productMap);
     await processor.detectPriceChanges(priceListId, priceList.supplierId, priceList.commerceId);
+    await processor.generateNotifications(priceList.commerceId, priceListId);
 
     const finalStatus =
       parseResult.errors.length > 0

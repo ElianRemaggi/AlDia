@@ -6,6 +6,9 @@ import { ImportJob, ImportJobStatus } from './entities/import-job.entity';
 import { ImportParseResult } from './entities/import-parse-result.entity';
 import { PriceChangeEvent } from './entities/price-change-event.entity';
 import { ParsedRow, ParseResult } from './import.types';
+import { CommerceProductSupplierLink } from '../commerce-product/entities/commerce-product-supplier-link.entity';
+import { createNotification } from '../notification/notification.service';
+import { NotificationType } from '../notification/entities/notification.entity';
 
 const supplierProductRepo = () => AppDataSource.getRepository(SupplierProduct);
 const priceListRepo = () => AppDataSource.getRepository(PriceList);
@@ -192,4 +195,61 @@ export async function updateImportJobStatus(
   }
 
   await importJobRepo().save(job);
+}
+
+export async function generateNotifications(
+  commerceId: string,
+  priceListId: string,
+): Promise<void> {
+  // 1. Load price list to get supplierId and name
+  const priceList = await priceListRepo().findOne({ where: { id: priceListId } });
+  if (!priceList) return;
+
+  // 2. Create import_finished notification
+  await createNotification(
+    commerceId,
+    NotificationType.IMPORT_FINISHED,
+    'Importación completada',
+    `La lista de precios fue procesada exitosamente.`,
+    { priceListId, supplierId: priceList.supplierId },
+  );
+
+  // 3. Load all price_change_events for this price list
+  const changeEvents = await priceChangeEventRepo().find({
+    where: { detectedInPriceListId: priceListId, commerceId },
+  });
+
+  if (changeEvents.length === 0) return;
+
+  // 4. Find favorites (commerce_product_supplier_links where is_favorite = true)
+  const favoriteLinks = await AppDataSource.getRepository(CommerceProductSupplierLink).find({
+    where: { commerceId, isFavorite: true },
+  });
+  const favoriteProductIds = new Set(favoriteLinks.map((l) => l.supplierProductId));
+
+  // 5. Create favorite_price_change notification for each affected favorite
+  for (const event of changeEvents) {
+    if (favoriteProductIds.has(event.supplierProductId)) {
+      await createNotification(
+        commerceId,
+        NotificationType.FAVORITE_PRICE_CHANGE,
+        'Cambio de precio en favorito',
+        `El precio de un producto favorito cambió un ${event.changePercentage}%.`,
+        {
+          priceChangeEventId: event.id,
+          supplierProductId: event.supplierProductId,
+          changePercentage: event.changePercentage,
+        },
+      );
+    }
+  }
+
+  // 6. Create summary price_change notification
+  await createNotification(
+    commerceId,
+    NotificationType.PRICE_CHANGE,
+    `${changeEvents.length} cambios de precio detectados`,
+    `Se detectaron ${changeEvents.length} cambios de precio en la última importación.`,
+    { priceListId, supplierId: priceList.supplierId, changeCount: changeEvents.length },
+  );
 }
