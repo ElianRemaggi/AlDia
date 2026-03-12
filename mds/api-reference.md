@@ -135,7 +135,7 @@ Limpia la cookie `refreshToken`. No tiene body.
 
 ## Commerces
 
-Todos los endpoints requieren rol `admin`.
+Todos los endpoints requieren rol `admin`. En el frontend, estas operaciones estarán disponibles en el **Admin Panel** (`/admin/commerces`), visible únicamente para usuarios con rol `admin`.
 
 | Método | Ruta | Descripción |
 |--------|------|-------------|

@@ -173,6 +173,16 @@
 
 ## Phase 6: Dashboard & Polish (Weeks 11-12)
 
+### 6.0 Admin Panel (solo visible para rol `admin`)
+- [ ] Layout/navegación separada para admins (rutas bajo `/admin`)
+- [ ] Listado de commerces con búsqueda y filtro por estado
+- [ ] Formulario para dar de alta un commerce (nombre, identificador, email, teléfono)
+- [ ] Formulario de edición de commerce
+- [ ] Activar / desactivar commerce (toggle `isActive`)
+- [ ] Listado de usuarios con filtro por rol y commerce
+- [ ] Formulario para crear usuario (nombre, email, password, rol, commerce asignado)
+- [ ] Protección de rutas: redirigir a dashboard si el usuario no es admin
+
 ### 6.1 Dashboard
 - [ ] Summary stats endpoint
 - [ ] Recent changes section
