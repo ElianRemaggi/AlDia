@@ -113,3 +113,46 @@ Copy from `mds/env-vars.md`. Key vars:
 - `JWT_SECRET` — min 256-bit random string, unique per environment
 - `GCS_BUCKET_NAME`, `GCS_PROJECT_ID`, `GCS_KEY_FILE` — Google Cloud Storage
 - `NEXT_PUBLIC_API_URL=http://localhost:4000/api/v1`
+
+## Workflow Rules
+
+Rules in `.claude/rules/rules.md` govern how Claude operates in this repo. Key mandates:
+
+- **Plan first:** Enter plan mode for any task with >3 steps, architectural decisions, or multi-file changes. If something goes wrong, stop and re-plan immediately.
+- **Subagents:** Delegate research, exploration, and analysis to subagents. One task per subagent. Reserve the main context for decisions and synthesis.
+- **Self-improvement loop:** After any user correction, update `mds/lessons.md` with the error, root cause, and a rule to prevent recurrence. Review `mds/lessons.md` at the start of each session.
+- **Verify before completing:** Never mark a task done without running tests, checking logs, and confirming correct behavior.
+- **Autonomous debugging:** When given a bug report, investigate logs, errors, and failing tests independently. Don't ask the user for step-by-step instructions.
+
+## Claude Configuration (`.claude/`)
+
+### Agents (`.claude/agents/`)
+
+Custom sub-agents with PriceHub-specific context:
+
+| Agent | Scope |
+|-------|-------|
+| `nextjs-pro` | Frontend: Next.js App Router, shadcn/ui, TanStack Query, auth flow |
+| `express-api-pro` | Backend: Express modules, middleware chain, multi-tenancy, validation |
+| `typeorm-postgres-pro` | Database: full PriceHub schema, entities, migrations, query patterns |
+| `bullmq-pro` | Queue: import pipeline, job payloads, Python worker communication |
+
+### Skills (`.claude/skills/`)
+
+| Skill | Content |
+|-------|---------|
+| `react-best-practices` | 58 Vercel performance rules across 8 categories with individual `rules/` files |
+| `composition-patterns` | React compound components, state management, React 19 APIs |
+| `python-development` | Plugin with 16 sub-skills + 3 agents (python-pro, fastapi-pro, django-pro) |
+| `express-rest-api` | Express.js patterns and conventions |
+| `jwt-authentication` | JWT auth implementation patterns |
+| `typeorm` | TypeORM entity and migration patterns |
+| `docker-deployment` | Docker containerization and deployment |
+| `error-handling` | Error handling strategies |
+| `async-patterns` | Node.js async/await, Promises, streams |
+| `deploy-to-vercel` | Vercel deployment scripts |
+| `web-design-guidelines` | UI/UX design guidelines |
+
+### Settings (`.claude/settings.json`)
+
+Permission configuration: `acceptEdits` mode with pre-approved `git`, `pnpm`, and `docker` commands. `.env*` file reads are denied.
