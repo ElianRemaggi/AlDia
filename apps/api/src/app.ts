@@ -8,6 +8,7 @@ import { errorHandler } from './shared/middleware';
 import authRoutes from './modules/auth/auth.routes';
 import commerceRoutes from './modules/commerce/commerce.routes';
 import supplierRoutes from './modules/supplier/supplier.routes';
+import { priceListRouter, importJobRouter } from './modules/import/import.routes';
 
 const app = express();
 
@@ -26,6 +27,8 @@ app.get('/api/v1/health', (_req, res) => {
 app.use('/api/v1/auth', authRoutes);
 app.use('/api/v1/commerces', commerceRoutes);
 app.use('/api/v1/suppliers', supplierRoutes);
+app.use('/api/v1/suppliers/:supplierId/price-lists', priceListRouter);
+app.use('/api/v1/import-jobs', importJobRouter);
 
 // Error handling
 app.use(errorHandler);

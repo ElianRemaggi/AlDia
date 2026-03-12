@@ -2,6 +2,7 @@ import 'reflect-metadata';
 import { AppDataSource } from './config/data-source';
 import { config } from './config';
 import app from './app';
+import './modules/import/import.worker';
 
 async function bootstrap() {
   try {

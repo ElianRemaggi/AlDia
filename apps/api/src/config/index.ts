@@ -34,4 +34,16 @@ export const config = {
   },
 
   logLevel: process.env.LOG_LEVEL || 'debug',
+
+  gcs: {
+    bucketName: process.env.GCS_BUCKET_NAME || '',
+    projectId: process.env.GCS_PROJECT_ID || '',
+    keyFile: process.env.GCS_KEY_FILE || '',
+  },
+
+  storage: {
+    // If GCS_BUCKET_NAME is empty, use local filesystem
+    useLocal: !process.env.GCS_BUCKET_NAME,
+    localUploadsDir: process.env.LOCAL_UPLOADS_DIR || './uploads',
+  },
 };

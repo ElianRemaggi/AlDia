@@ -47,3 +47,58 @@ export function createSupplierFixture(overrides: Record<string, unknown> = {}) {
     ...overrides,
   };
 }
+
+export function createSupplierProductFixture(overrides: Record<string, unknown> = {}) {
+  return {
+    id: 'sp-uuid-1',
+    commerceId: 'commerce-uuid-1',
+    supplierId: 'supplier-uuid-1',
+    supplierProductCode: 'PROD-001',
+    name: 'Test Product',
+    description: null,
+    unit: 'unidad',
+    brand: null,
+    category: null,
+    isActive: true,
+    createdAt: new Date('2024-01-01'),
+    updatedAt: new Date('2024-01-01'),
+    ...overrides,
+  };
+}
+
+export function createPriceListFixture(overrides: Record<string, unknown> = {}) {
+  return {
+    id: 'pl-uuid-1',
+    commerceId: 'commerce-uuid-1',
+    supplierId: 'supplier-uuid-1',
+    sourceType: 'excel' as const,
+    sourceFileUrl: null,
+    sourceFileName: 'lista.xlsx',
+    uploadedByUserId: 'user-uuid-1',
+    status: 'pending' as const,
+    versionNumber: 1,
+    effectiveDate: null,
+    uploadedAt: new Date('2024-01-01'),
+    processedAt: null,
+    notes: null,
+    createdAt: new Date('2024-01-01'),
+    updatedAt: new Date('2024-01-01'),
+    ...overrides,
+  };
+}
+
+export function createImportJobFixture(overrides: Record<string, unknown> = {}) {
+  return {
+    id: 'job-uuid-1',
+    priceListId: 'pl-uuid-1',
+    jobType: 'parse_document' as const,
+    status: 'queued' as const,
+    startedAt: null,
+    finishedAt: null,
+    errorMessage: null,
+    metaJson: null,
+    createdAt: new Date('2024-01-01'),
+    priceList: null,
+    ...overrides,
+  };
+}

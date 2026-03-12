@@ -11,6 +11,8 @@ vi.mock('../../config', () => ({
     jwt: { secret: 'test-secret', accessExpiry: '15m', refreshExpiry: '7d' },
     cors: { origin: '*' },
     logLevel: 'error',
+    redis: { host: 'localhost', port: 6379, password: undefined },
+    storage: { useLocal: true, localUploadsDir: './uploads' },
   },
 }));
 vi.mock('bcrypt');
