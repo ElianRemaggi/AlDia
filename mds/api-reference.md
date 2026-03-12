@@ -355,9 +355,7 @@ No requiere autenticación.
 
 ---
 
-## Price Lists e Import (Paso 3)
-
-Estos endpoints aún no están implementados. Se construyen en el Paso 3.
+## Price Lists e Import ✅
 
 | Método | Ruta | Auth | Descripción |
 |--------|------|------|-------------|

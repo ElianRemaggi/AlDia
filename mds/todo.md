@@ -56,21 +56,21 @@
 - [x] List with search and pagination
 
 ### 2.2 Supplier Products
-- [ ] SupplierProduct entity + migration (Paso 3)
+- [x] SupplierProduct entity + migration (Paso 3) ✅
 - [ ] CRUD endpoints: GET /suppliers/:id/products, POST, GET/:pid, PATCH/:pid
 
 ### 2.3 File Upload
-- [ ] Multer configuration for file upload
-- [ ] Google Cloud Storage integration — `shared/storage/gcs.ts`
-- [ ] File type validation (xlsx, xls, csv)
-- [ ] File size limit (20MB)
+- [x] Multer configuration for file upload ✅
+- [x] Storage dual: local `./uploads/` en dev, GCS en prod — `shared/storage/storage.ts` ✅
+- [x] File type validation (xlsx, xls, csv) ✅
+- [x] File size limit (20MB) ✅
 
 ### 2.4 Import Pipeline — Infrastructure (Paso 3)
-- [ ] BullMQ queue setup — `modules/import/import.queue.ts`
-- [ ] Import job creation flow
-- [ ] Job status tracking endpoint (GET /import-jobs/:id)
-- [ ] Python worker — `services/document-processor/worker/`
-- [ ] Communication protocol documentado en `mds/import-pipeline.md`
+- [x] BullMQ queue setup — `modules/import/import.queue.ts` ✅
+- [x] Import job creation flow ✅
+- [x] Job status tracking endpoint (GET /import-jobs/:id) ✅
+- [x] Python worker — `services/document-processor/worker/` ✅
+- [x] Communication protocol documentado en `mds/import-pipeline.md` ✅
 
 ### 2.5 Parsers — Excel/CSV ✅
 - [x] Python: Excel parser (openpyxl)
@@ -84,15 +84,15 @@
 - [ ] Table detection and row extraction
 - [ ] Handle multi-page PDFs
 
-### 2.7 Import Pipeline — Processing (Paso 3)
-- [ ] Segunda migración: price_lists, price_list_items, import_jobs, price_change_events, import_parse_results
-- [ ] POST /suppliers/:id/price-lists/upload
-- [ ] Node Worker events: completed / failed
-- [ ] matchOrCreateProduct (por código, luego nombre normalizado)
-- [ ] createPriceListItems (inmutables)
-- [ ] detectPriceChanges
-- [ ] generateNotifications (favoritos)
-- [ ] Store import_parse_results
+### 2.7 Import Pipeline — Processing (Paso 3) ✅
+- [x] Segunda migración: price_lists, price_list_items, import_jobs, price_change_events, import_parse_results ✅
+- [x] POST /suppliers/:id/price-lists/upload ✅
+- [x] Node Worker events: completed / failed ✅
+- [x] matchOrCreateProduct (por código, luego nombre normalizado) ✅
+- [x] createPriceListItems (inmutables) ✅
+- [x] detectPriceChanges ✅
+- [ ] generateNotifications (favoritos) — requiere commerce_product_supplier_links (Paso 4)
+- [x] Store import_parse_results ✅
 
 ---
 
@@ -231,4 +231,13 @@
 - ExcelParser + CsvParser implementados y testeados
 - Auto-detección de headers y columnas
 - Normalización de precios ARS y decimal_point
-- Pendiente: conectar a BullMQ (Paso 3)
+
+### Paso 3 ✅ (completado — 2026-03-12)
+- 6 entidades: SupplierProduct, PriceList, PriceListItem, ImportJob, ImportParseResult, PriceChangeEvent
+- Migración 1710000000001-ImportPipeline (4 enums, 6 tablas, índices)
+- Storage dual: local en dev, GCS en prod (`shared/storage/storage.ts`)
+- Módulo import completo: service, processor, worker, controller, routes, dto
+- BullMQ Queue + Worker (Node escucha eventos, Python procesa)
+- Python worker: bullmq_worker.py + job_handler.py
+- 30 tests nuevos, 142 tests totales ✅
+- Pendiente menor: generateNotifications para favoritos (requiere Paso 4)
