@@ -4,7 +4,9 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Status
 
-**PriceHub** is a SaaS platform for centralizing supplier price lists. This repository currently contains **documentation and planning only** — no application code has been written yet. The `mds/` directory holds all architectural and feature docs generated from `idea.md`.
+**PriceHub** is a SaaS platform for centralizing supplier price lists. The `mds/` directory holds all architectural and feature docs.
+
+**Current state:** Step 1 complete — `apps/api` has auth, commerce, and supplier modules with migrations and tests. `apps/web` and `services/document-processor` do not exist yet.
 
 ## Development Order
 
@@ -19,32 +21,24 @@ Follow `ordenDesarrollo.md` strictly. Build in this sequence:
 
 ## Development Commands
 
-Once the monorepo is initialized with pnpm workspaces:
-
 ```bash
 # Infrastructure (PostgreSQL + Redis)
 docker-compose up -d
 
-# Frontend (Next.js — localhost:3000)
-cd apps/web && pnpm dev
-
 # Backend (Express — localhost:4000)
-cd apps/api && pnpm dev
-
-# Document processor (Python)
-cd services/document-processor
-python -m venv venv && source venv/bin/activate
-pip install -r requirements.txt
-python main.py
+pnpm --filter api dev
 
 # Tests
-pnpm test              # unit tests (Vitest)
-pnpm test:e2e          # end-to-end tests
-pnpm --filter api test # single package
+pnpm test                          # all unit tests
+pnpm --filter api test             # api tests only
+pnpm --filter api test:watch       # watch mode
+pnpm --filter api test:coverage    # with coverage
 
-# Database migrations
-cd apps/api && pnpm typeorm migration:run
-cd apps/api && pnpm typeorm migration:generate -- -n MigrationName
+# Database
+pnpm --filter api migration:run
+pnpm --filter api migration:revert
+pnpm --filter api migration:generate -- src/shared/database/migrations/MigrationName
+pnpm --filter api seed
 
 # Lint
 pnpm lint
@@ -57,7 +51,7 @@ pnpm lint
 Three-tier architecture with an async document processing microservice:
 
 - **`apps/web`** — Next.js + TypeScript + Tailwind + shadcn/ui. State via TanStack Query (server state) + React useState (local UI).
-- **`apps/api`** — Express.js + TypeScript + TypeORM. REST API on port 4000. Modular structure under `src/modules/` (auth, catalog, import, purchase, notification).
+- **`apps/api`** — Express.js + TypeScript + TypeORM. REST API on port 4000. Modular structure under `src/modules/` (auth, commerce, supplier; catalog/import/purchase/notification planned). Path alias `@/` → `src/`. Each module follows the pattern: `{module}.controller.ts`, `{module}.service.ts`, `{module}.routes.ts`, `{module}.dto.ts`, `entities/{module}.entity.ts`. Shared middleware in `src/shared/middleware/`. Test fixtures/mocks in `src/test/`.
 - **`services/document-processor`** — Python microservice. Polls BullMQ queue via Redis, parses files, returns normalized JSON.
 - **`packages/shared`** — Shared TypeScript types and constants between frontend and backend.
 
