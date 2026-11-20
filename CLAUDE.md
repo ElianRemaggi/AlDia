@@ -6,7 +6,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 **PriceHub** is a SaaS platform for centralizing supplier price lists. The `mds/` directory holds all architectural and feature docs.
 
-**Current state:** Steps 1–4 complete (backend done). `apps/api` has auth, commerce, supplier, import, catalog, commerce-product, markup, purchase and notification modules, 3 migrations and 249 unit tests; admin user CRUD in `modules/user` (`/admin/users`). `services/document-processor` has Excel/CSV/PDF parsers + BullMQ worker (Step 6 was done early: PDF tables via pdfplumber, LLM fallback via an OpenAI-compatible API, DeepSeek by default). **Next: Step 5 (frontend) — `apps/web` does not exist yet.** Production deploy is not started. Minor backend pending items are tracked in `mds/todo.md`.
+**Current state:** Steps 1–4 complete (backend done). `apps/api` has auth, commerce, supplier, import, catalog, commerce-product, markup, purchase and notification modules, 3 migrations and 249 unit tests; admin user CRUD in `modules/user` (`/admin/users`). `services/document-processor` has Excel/CSV/PDF parsers + BullMQ worker (Step 6 was done early: PDF tables via pdfplumber, LLM fallback via an OpenAI-compatible API, DeepSeek by default). **Step 5 (frontend) in progress:** `apps/web` exists with phase F1 done (login, layout, suppliers CRUD, admin commerces/users); next is F2 (price-list upload + import job polling). Production deploy is not started. Minor backend pending items are tracked in `mds/todo.md`.
 
 **Deployment target:** Docker on a self-hosted VPS/server for the whole stack (web, api, processor, PostgreSQL, Redis). Do NOT use or add config for Railway, Vercel or Cloud Run. See `mds/deployment.md`.
 
@@ -30,6 +30,9 @@ docker-compose up -d
 # Backend (Express — localhost:4000)
 pnpm --filter api dev
 
+# Frontend (Next.js — localhost:3000, proxies /api/v1 → :4000)
+pnpm dev:web
+
 # Tests
 pnpm test                          # all unit tests
 pnpm --filter api test             # api tests only
@@ -52,7 +55,7 @@ pnpm lint
 
 Three-tier architecture with an async document processing microservice:
 
-- **`apps/web`** — Next.js + TypeScript + Tailwind + shadcn/ui. State via TanStack Query (server state) + React useState (local UI).
+- **`apps/web`** — Next.js 16 (App Router, Cache Components) + React 19 + Tailwind v4 + shadcn/ui on Base UI + TanStack Query. **Read `apps/web/AGENTS.md` and the bundled docs in `apps/web/node_modules/next/dist/docs/` before writing Next code** — APIs differ from older Next. Browser calls same-origin `/api/v1` (Next rewrite → API); auth is enforced client-side by `AuthGate`, not middleware. Conventions and pitfalls: `mds/frontend.md` (Auth section).
 - **`apps/api`** — Express.js + TypeScript + TypeORM. REST API on port 4000. Modular structure under `src/modules/` (auth, user, commerce, supplier, import, catalog, commerce-product, markup, purchase, notification). Path alias `@/` → `src/`. Each module follows the pattern: `{module}.controller.ts`, `{module}.service.ts`, `{module}.routes.ts`, `{module}.dto.ts`, `entities/{module}.entity.ts`. Shared middleware in `src/shared/middleware/`. Test fixtures/mocks in `src/test/`.
 - **`services/document-processor`** — Python microservice. Polls BullMQ queue via Redis, parses files, returns normalized JSON.
 - **`packages/shared`** — Shared TypeScript types and constants between frontend and backend.

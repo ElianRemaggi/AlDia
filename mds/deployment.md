@@ -33,6 +33,8 @@
 
 Solo el reverse proxy expone puertos al exterior (80/443). PostgreSQL, Redis, API, web y processor quedan en la red interna de Docker.
 
+**Routing del proxy:** `pricehub.app/api/*` → `api:4000` y el resto → `web:3000`. El frontend llama siempre a `/api/v1` en su mismo origen: la cookie de refresh (`sameSite: strict`, `path: /api/v1/auth/refresh`) solo funciona así, sin CORS. Un subdominio `api.pricehub.app` es opcional (para integraciones), no lo usa el browser.
+
 ## Local Development
 
 `docker-compose.yml` levanta solo la infraestructura (PostgreSQL 15 + Redis 7):
@@ -101,7 +103,9 @@ CMD ["python", "main.py"]
 
 ### Dockerfile (Next.js)
 
-Build con `output: "standalone"` y runtime `node:20-alpine` ejecutando `node server.js`. `NEXT_PUBLIC_API_URL` se inyecta en build time.
+Build con `output: "standalone"` (ya configurado) y runtime `node:22-alpine`. En el monorepo el server queda en `.next/standalone/apps/web/server.js`; copiar `.next/static` y `public/` al lado (`next start` no sirve con standalone).
+
+Los rewrites de `next.config.ts` (`/api/v1/*` → `API_PROXY_TARGET`) se resuelven **en build**. Con el reverse proxy ruteando `/api/*` a la API no hacen falta en producción; si se sirve la web sin proxy delante, buildear con `API_PROXY_TARGET=http://api:4000`.
 
 ## Database Migrations
 

@@ -45,8 +45,10 @@ CORS_ORIGIN=http://localhost:3000
 ## Frontend (Next.js)
 
 ```env
-NEXT_PUBLIC_API_URL=http://localhost:4000/api/v1
-NEXT_PUBLIC_APP_NAME=PriceHub
+# Opcional. Default /api/v1: el browser llama al mismo origen (ver mds/frontend.md, Auth)
+NEXT_PUBLIC_API_URL=/api/v1
+# Destino del rewrite /api/v1/* → API. Se evalúa en build. Default http://localhost:4000
+API_PROXY_TARGET=http://localhost:4000
 ```
 
 ## Document Processor (Python)

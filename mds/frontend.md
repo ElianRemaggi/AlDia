@@ -1,6 +1,10 @@
 # Frontend Planning — PriceHub
 
-Stack: **Next.js 14 App Router + TypeScript + Tailwind CSS + shadcn/ui + TanStack Query v5**
+Stack: **Next.js 16 App Router (Cache Components) + React 19 + TypeScript + Tailwind CSS v4 + shadcn/ui (Base UI) + TanStack Query v5**
+
+> **Estado (2026-11-20):** F1 implementada en `apps/web`. Las secciones de auth y estructura de abajo reflejan lo implementado; donde difiere del plan original se indica.
+>
+> **Next 16 no es el Next que conocés:** antes de escribir código leé la guía correspondiente en `apps/web/node_modules/next/dist/docs/` (ver `apps/web/AGENTS.md`).
 
 ---
 
@@ -136,115 +140,49 @@ apps/web/
 
 ---
 
-## Auth — Flujo y almacenamiento de tokens
+## Auth — Flujo y almacenamiento de tokens (implementado)
 
 ### Tokens
-- **Access token:** guardado en memoria (`AuthContext`), nunca en `localStorage` (protección XSS)
-- **Refresh token:** httpOnly cookie — lo setea la API, el navegador lo envía automáticamente
+- **Access token:** en memoria (`lib/auth/token-store.ts`), nunca en `localStorage` (XSS)
+- **Refresh token:** cookie httpOnly que setea la API con `sameSite: strict` y `path: /api/v1/auth/refresh`
 
-### Flujo al cargar la app
+### Mismo origen: el browser siempre llama a `/api/v1`
+- En dev, `next.config.ts` hace rewrite de `/api/v1/*` → `API_PROXY_TARGET` (default `http://localhost:4000`). **Se evalúa en build**: para un build de producción, setear `API_PROXY_TARGET` al buildear o rutear `/api/*` en el reverse proxy (ver `deployment.md`).
+- Así la cookie `sameSite: strict` + `path` funciona sin CORS.
+- `NEXT_PUBLIC_API_URL` es opcional (default `/api/v1`).
+
+### Protección de rutas — sin middleware/proxy
+El plan original usaba `middleware.ts` leyendo la cookie de refresh. **No funciona**: la cookie tiene `path=/api/v1/auth/refresh`, el browser no la manda a `/suppliers`. En su lugar:
+
 ```
-app init
-  └── AuthProvider mounts
-        └── llama GET /auth/me con access token (si existe en memoria)
-              ├── 200 → usuario autenticado, guardar en context
-              └── 401 → llamar POST /auth/refresh (cookie se envía sola)
-                      ├── 200 → nuevo accessToken → reintentar /auth/me
-                      └── 401 → usuario no autenticado → redirigir a /login
-```
+AuthProvider (app/providers.tsx)
+  └── al montar: tokenStore vacío → POST /auth/refresh (cookie) → GET /auth/me
+        ├── ok   → state = authenticated
+        └── fail → state = unauthenticated
 
-### Token refresh automático en requests
-```typescript
-// lib/api/client.ts — interceptor de 401
-async function fetchWithAuth(input: RequestInfo, init?: RequestInit) {
-  let response = await fetch(input, {
-    ...init,
-    headers: { ...init?.headers, Authorization: `Bearer ${tokenStore.get()}` },
-    credentials: 'include',   // para que el cookie vaya en /auth/refresh
-  });
-
-  if (response.status === 401) {
-    // Intentar refresh
-    const refreshed = await fetch(`${API_URL}/auth/refresh`, {
-      method: 'POST',
-      credentials: 'include',
-    });
-    if (refreshed.ok) {
-      const { data } = await refreshed.json();
-      tokenStore.set(data.accessToken);
-      // Reintentar request original
-      response = await fetch(input, {
-        ...init,
-        headers: { ...init?.headers, Authorization: `Bearer ${data.accessToken}` },
-        credentials: 'include',
-      });
-    } else {
-      tokenStore.clear();
-      window.location.href = '/login';
-    }
-  }
-  return response;
-}
+AuthGate role="commerce" | "admin"   (layouts de (dashboard) y admin)
+  ├── loading          → skeleton (mismo HTML en server y client → sin hydration mismatch)
+  ├── unauthenticated  → router.replace('/login')
+  └── rol incorrecto   → router.replace(homeFor(user))   // admin → /admin, commerce → /
 ```
 
-### `lib/auth/token-store.ts`
-```typescript
-let _token: string | null = null;
+### `lib/api/client.ts`
+- `api<T>(path, { method, body, query })` devuelve el body JSON (`{ status, data, meta? }`) o lanza `ApiError(message, status, fieldErrors)`.
+- En 401 refresca el token **una vez** (requests concurrentes comparten un único refresh) y reintenta; si el refresh falla, llama al handler de sesión expirada (AuthProvider limpia token + cache de TanStack Query).
+- Endpoints tipados en `lib/api/endpoints.ts` (`authApi`, `suppliersApi`, `commercesApi`, `usersApi`).
 
-export const tokenStore = {
-  get:   () => _token,
-  set:   (t: string) => { _token = t; },
-  clear: () => { _token = null; },
-};
-```
-
-### Protección de rutas (Next.js Middleware)
-```typescript
-// middleware.ts
-import { NextResponse } from 'next/server';
-import type { NextRequest } from 'next/server';
-
-export function middleware(request: NextRequest) {
-  // El middleware no puede leer la memoria — solo verifica la cookie de refresh
-  // como señal de sesión activa. AuthProvider hace la validación real.
-  const hasRefreshCookie = request.cookies.has('refreshToken');
-  const isAuthPage  = request.nextUrl.pathname.startsWith('/login');
-  const isAdminPage = request.nextUrl.pathname.startsWith('/admin');
-
-  if (!hasRefreshCookie && !isAuthPage) {
-    return NextResponse.redirect(new URL('/login', request.url));
-  }
-  if (hasRefreshCookie && isAuthPage) {
-    return NextResponse.redirect(new URL('/', request.url));
-  }
-  return NextResponse.next();
-}
-
-export const config = {
-  matcher: ['/((?!_next/static|_next/image|favicon.ico|api).*)'],
-};
-```
-
-**Protección por rol** (en el layout, no en middleware):
-```typescript
-// components/layout/role-guard.tsx
-'use client';
-export function AdminGuard({ children }: { children: React.ReactNode }) {
-  const { user } = useAuth();
-  const router = useRouter();
-
-  useEffect(() => {
-    if (user && user.role !== 'admin') router.replace('/');
-  }, [user, router]);
-
-  if (!user || user.role !== 'admin') return null;
-  return <>{children}</>;
-}
-```
+### Next 16 + Cache Components — reglas usadas en `apps/web`
+- Páginas = Server Components finos (metadata) que renderizan componentes cliente.
+- Rutas dinámicas: la page pasa `params` (Promise) al componente cliente dentro de `<Suspense>`, que lo resuelve con `use(params)`.
+- `usePathname` (nav activa) va dentro de `<Suspense>`.
+- Con `cacheComponents` Next preserva rutas visitadas con `<Activity>`: los componentes no se desmontan al navegar. **No usar `key={...updatedAt}` para resetear forms**: remonta el form y TanStack descarta los callbacks de `mutate()` (pasó en F1).
+- Botones que navegan: `ButtonLink` (un `<Link>` real con estilos de botón). No usar `<Button render={<Link/>}>`: Base UI le pone `role="button"`.
 
 ---
 
 ## TanStack Query — Convenciones
+
+> Implementado en `lib/query-keys.ts` **sin `commerceId` en las keys**: la API ya scopea por token y el cache completo se limpia en logout. Hooks en `lib/hooks/` (`use-suppliers.ts`, `use-admin.ts`). Los ejemplos de abajo son el plan original.
 
 ### Query key factory (`lib/query-keys.ts`)
 ```typescript
@@ -452,21 +390,21 @@ export function useImportJobPoller(jobId: string | null) {
 
 Las páginas se construyen **en orden de disponibilidad de la API**:
 
-### Fase F1 — Con API Paso 1 (disponible ahora)
-Estas páginas pueden construirse e integrarse hoy:
-- [ ] Setup `apps/web` (Next.js + Tailwind + shadcn/ui)
-- [ ] `lib/api/client.ts` — fetch wrapper con refresh interceptor
-- [ ] `lib/auth/` — AuthProvider, token-store, useAuth hook
-- [ ] `middleware.ts` — protección de rutas por cookie
-- [ ] `/login` — form, submit, redirect
-- [ ] Layout dashboard (sidebar, header, role-guard)
-- [ ] `/suppliers` — list con search y paginación
-- [ ] `/suppliers/new` y `/suppliers/:id/edit` — SupplierForm
-- [ ] `/suppliers/:id` — detalle básico
-- [ ] `/admin/commerces` — lista + toggle isActive
-- [ ] `/admin/commerces/new` y `edit`
-- [ ] `/admin/users` — lista
-- [ ] `/admin/users/new` — crear usuario via `POST /admin/users`
+### Fase F1 — ✅ Implementada (2026-11-20)
+- [x] Setup `apps/web` (Next.js 16 + Tailwind v4 + shadcn/ui Base UI + TanStack Query)
+- [x] `lib/api/client.ts` — fetch wrapper con refresh (deduplicado) + `ApiError`
+- [x] `lib/auth/` — AuthProvider, token-store, useAuth
+- [x] Protección de rutas con `AuthGate` (no middleware: ver sección Auth)
+- [x] `/login` — form con validación, error inline, redirect por rol
+- [x] Layout (sidebar + header con menú de usuario; nav horizontal en mobile)
+- [x] `/suppliers` — lista con búsqueda (debounce), filtro de estado y paginación
+- [x] `/suppliers/new` y `/suppliers/:id/edit` — SupplierForm (código duplicado → error en el campo)
+- [x] `/suppliers/:id` — detalle, desactivar (confirm) / reactivar
+- [x] `/admin/commerces` — lista + búsqueda/filtro + toggle isActive optimista
+- [x] `/admin/commerces/new` y `edit`
+- [x] `/admin/users` — lista con filtros rol/comercio/búsqueda + toggle activo (deshabilitado para uno mismo)
+- [x] `/admin/users/new` — `POST /admin/users`
+- Verificado con Playwright contra build de producción + API real (21 escenarios).
 
 ### Fase F2 — Con API Paso 3 (Import Pipeline)
 - [ ] `/suppliers/:id/price-lists` — historial de listas
@@ -499,17 +437,11 @@ Estas páginas pueden construirse e integrarse hoy:
 
 ## Dependencias del proyecto web
 
-```bash
-# En apps/web después de crear el proyecto Next.js
-pnpm add @tanstack/react-query @tanstack/react-query-devtools
-pnpm add zod
-pnpm add sonner                  # toasts
-pnpm add lucide-react            # iconos
+Instaladas: `@tanstack/react-query` (+ devtools), `zod`, `sonner`, `lucide-react`, shadcn/ui (`base-nova`, sobre `@base-ui/react`).
 
-# shadcn/ui (CLI instala componentes individualmente)
-npx shadcn-ui@latest init
-npx shadcn-ui@latest add button input form table badge dialog
-npx shadcn-ui@latest add select dropdown-menu sheet tabs card
+```bash
+# Agregar componentes shadcn (desde apps/web)
+pnpm dlx shadcn@latest add <componente>
 ```
 
 ---
@@ -517,6 +449,8 @@ npx shadcn-ui@latest add select dropdown-menu sheet tabs card
 ## Variables de entorno (`apps/web/.env.local`)
 
 ```env
-NEXT_PUBLIC_API_URL=http://localhost:4000/api/v1
-NEXT_PUBLIC_APP_NAME=PriceHub
+# Opcional: por defecto el browser usa /api/v1 (mismo origen)
+NEXT_PUBLIC_API_URL=/api/v1
+# Destino del rewrite /api/v1/* (dev y build). Default http://localhost:4000
+API_PROXY_TARGET=http://localhost:4000
 ```

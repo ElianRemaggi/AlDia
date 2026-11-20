@@ -13,7 +13,7 @@
 | 2. Document Processor (Excel/CSV) | ✅ |
 | 3. Import Pipeline (API + BullMQ + Python) | ✅ |
 | 4. Remaining API (catálogo, markup, compras, notificaciones) | ✅ (con pendientes menores) |
-| 5. Frontend (`apps/web`) | ❌ No iniciado |
+| 5. Frontend (`apps/web`) | 🟡 F1 ✅ (auth, layout, proveedores, admin). Siguen F2–F5 |
 | 6. PDF parser | ✅ (adelantado; tablas + fallback LLM) |
 | Deploy (Docker en VPS / servidor propio) | ❌ No iniciado |
 
@@ -178,19 +178,19 @@
 > Ver plan detallado en `mds/frontend.md`. Toda la API que necesita F1–F4 ya está disponible.
 
 ### F1 — Base
-- [ ] Setup `apps/web` (Next.js + Tailwind + shadcn/ui)
-- [ ] `lib/api/client.ts` — fetch wrapper con refresh interceptor
-- [ ] `lib/auth/` — AuthProvider, token-store, useAuth
-- [ ] `middleware.ts` — protección de rutas
-- [ ] `/login` — formulario de login
-- [ ] Layout dashboard (sidebar, header)
-- [ ] `/suppliers` — lista con búsqueda y paginación
-- [ ] `/suppliers/new` y `/suppliers/:id/edit`
-- [ ] `/suppliers/:id` — detalle
-- [ ] `/admin/commerces` — lista + toggle isActive
-- [ ] `/admin/commerces/new` y `/:id/edit`
-- [ ] `/admin/users` — lista
-- [ ] `/admin/users/new`
+- [x] Setup `apps/web` (Next.js 16 + Tailwind v4 + shadcn/ui Base UI + TanStack Query)
+- [x] `lib/api/client.ts` — fetch wrapper con refresh deduplicado
+- [x] `lib/auth/` — AuthProvider, token-store, useAuth
+- [x] Protección de rutas con `AuthGate` (el middleware por cookie no funciona: ver `mds/frontend.md`)
+- [x] `/login` — formulario de login
+- [x] Layout dashboard (sidebar, header)
+- [x] `/suppliers` — lista con búsqueda y paginación
+- [x] `/suppliers/new` y `/suppliers/:id/edit`
+- [x] `/suppliers/:id` — detalle
+- [x] `/admin/commerces` — lista + toggle isActive
+- [x] `/admin/commerces/new` y `/:id/edit`
+- [x] `/admin/users` — lista
+- [x] `/admin/users/new`
 
 ### F2 — Importación
 - [ ] `/suppliers/:id/price-lists` — historial
@@ -232,7 +232,7 @@
 
 - [ ] Dockerfile `apps/api` (multi-stage, pnpm workspace)
 - [ ] Dockerfile `services/document-processor`
-- [ ] Dockerfile `apps/web` (Next.js standalone output)
+- [ ] Dockerfile `apps/web` (`output: "standalone"` ya configurado; server en `.next/standalone/apps/web/server.js`)
 - [ ] `docker-compose.prod.yml`: web, api, processor, postgres, redis, reverse proxy
 - [ ] Reverse proxy con HTTPS (Caddy o Nginx + Let's Encrypt)
 - [ ] Migraciones automáticas al arrancar la API

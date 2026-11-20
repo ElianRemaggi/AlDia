@@ -4,8 +4,9 @@
   "packageManager": "pnpm@9.15.4",
   "scripts": {
     "dev": "pnpm --filter api dev",
-    "build": "pnpm --filter api build",
-    "lint": "eslint . --ext .ts,.tsx",
+    "dev:web": "pnpm --filter web dev",
+    "build": "pnpm --filter api build && pnpm --filter web build",
+    "lint": "eslint . --ext .ts,.tsx && pnpm --filter web lint",
     "test": "pnpm --filter api test",
     "test:e2e": "pnpm --filter api test:e2e"
   },
