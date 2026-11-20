@@ -2,6 +2,8 @@ import { describe, it, expect, vi } from 'vitest';
 import { AppError, errorHandler } from './error-handler';
 import { createMockRequest, createMockResponse, createMockNext } from '../../test/mocks/mock-express';
 import { Request, Response, NextFunction } from 'express';
+import { MulterError } from 'multer';
+import { z } from 'zod';
 
 describe('AppError', () => {
   it('should set statusCode, message, and isOperational', () => {
@@ -49,5 +51,40 @@ describe('errorHandler', () => {
     expect(res.status).toHaveBeenCalledWith(500);
     expect(res.json).toHaveBeenCalledWith({ status: 'error', message: 'Internal server error' });
     expect(consoleSpy).toHaveBeenCalled();
+  });
+
+  it('should return 400 with field errors for a ZodError', () => {
+    const parsed = z.object({ page: z.number() }).safeParse({ page: 'x' });
+    const res = createMockResponse() as Response;
+
+    errorHandler(parsed.error!, createMockRequest() as Request, res, createMockNext());
+
+    expect(res.status).toHaveBeenCalledWith(400);
+    expect(res.json).toHaveBeenCalledWith(
+      expect.objectContaining({
+        message: 'Validation failed',
+        errors: [expect.objectContaining({ field: 'page' })],
+      }),
+    );
+  });
+
+  it('should return 413 for files over the multer size limit', () => {
+    const res = createMockResponse() as Response;
+
+    errorHandler(new MulterError('LIMIT_FILE_SIZE', 'file'), createMockRequest() as Request, res, createMockNext());
+
+    expect(res.status).toHaveBeenCalledWith(413);
+    expect(res.json).toHaveBeenCalledWith({
+      status: 'error',
+      message: 'File too large. Maximum size is 20MB',
+    });
+  });
+
+  it('should return 400 for other multer errors', () => {
+    const res = createMockResponse() as Response;
+
+    errorHandler(new MulterError('LIMIT_UNEXPECTED_FILE', 'other'), createMockRequest() as Request, res, createMockNext());
+
+    expect(res.status).toHaveBeenCalledWith(400);
   });
 });

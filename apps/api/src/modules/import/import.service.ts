@@ -2,6 +2,7 @@ import { AppDataSource } from '../../config/data-source';
 import { PriceList, PriceListSourceType, PriceListStatus } from './entities/price-list.entity';
 import { ImportJob, ImportJobType, ImportJobStatus } from './entities/import-job.entity';
 import { AppError } from '../../shared/middleware';
+import { Supplier } from '../supplier/entities/supplier.entity';
 import { uploadFile, getFileUrl } from '../../shared/storage/storage';
 import { documentProcessingQueue } from './import.queue';
 import { ParseDocumentJobData } from './import.types';
@@ -9,6 +10,7 @@ import type { ListPriceListsQuery, UploadPriceListDto } from './import.dto';
 
 const priceListRepo = () => AppDataSource.getRepository(PriceList);
 const importJobRepo = () => AppDataSource.getRepository(ImportJob);
+const supplierRepo = () => AppDataSource.getRepository(Supplier);
 
 function resolveSourceType(filename: string): PriceListSourceType {
   const ext = filename.toLowerCase().match(/\.[^.]+$/)?.[0];
@@ -36,6 +38,16 @@ export async function uploadPriceList(
   dto: UploadPriceListDto,
 ): Promise<{ priceList: PriceList; importJob: ImportJob }> {
   const sourceType = resolveSourceType(file.originalname);
+
+  // Tenant isolation: the supplier must belong to the caller's commerce.
+  const supplier = await supplierRepo().findOne({ where: { id: supplierId, commerceId } });
+  if (!supplier) {
+    throw new AppError('Supplier not found', 404);
+  }
+  if (!supplier.isActive) {
+    throw new AppError('Supplier is inactive. Reactivate it to upload price lists.', 422);
+  }
+
   const versionNumber = await computeNextVersionNumber(supplierId, commerceId);
 
   // Step 1: create price_list with pending status to obtain the ID
@@ -91,7 +103,7 @@ export async function uploadPriceList(
       header_row: null,
       column_mapping: null,
       skip_rows: [],
-      price_format: 'decimal_point',
+      price_format: dto.priceFormat ?? 'decimal_point',
       encoding: 'utf-8',
     },
   };

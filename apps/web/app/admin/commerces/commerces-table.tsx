@@ -10,6 +10,7 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { formatDate } from "@/lib/format";
 import { errorMessage } from "@/lib/forms";
 import { useCommerces, useToggleCommerce } from "@/lib/hooks/use-admin";
 
@@ -20,7 +21,6 @@ const STATUS_ITEMS = [
 ] as const;
 type StatusFilter = (typeof STATUS_ITEMS)[number]["value"];
 
-const dateFormat = new Intl.DateTimeFormat("es-AR", { dateStyle: "medium" });
 
 export function CommercesTable() {
   const query = useCommerces();
@@ -133,7 +133,7 @@ export function CommercesTable() {
                     {commerce.phone ?? "—"}
                   </TableCell>
                   <TableCell className="hidden text-muted-foreground md:table-cell">
-                    {dateFormat.format(new Date(commerce.createdAt))}
+                    {formatDate(commerce.createdAt)}
                   </TableCell>
                   <TableCell>
                     <Switch

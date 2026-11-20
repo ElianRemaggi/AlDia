@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import multer from 'multer';
 import {
+  AppError,
   asyncHandler,
   authenticate,
   scopeToCommerce,
@@ -18,7 +19,7 @@ const upload = multer({
     if (ext && allowed.includes(ext)) {
       cb(null, true);
     } else {
-      cb(new Error('File type not supported. Allowed: xlsx, xls, csv, pdf'));
+      cb(new AppError('Unsupported file type. Allowed: xlsx, xls, csv, pdf', 400));
     }
   },
 });

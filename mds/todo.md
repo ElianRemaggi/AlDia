@@ -13,7 +13,7 @@
 | 2. Document Processor (Excel/CSV) | ✅ |
 | 3. Import Pipeline (API + BullMQ + Python) | ✅ |
 | 4. Remaining API (catálogo, markup, compras, notificaciones) | ✅ (con pendientes menores) |
-| 5. Frontend (`apps/web`) | 🟡 F1 ✅ (auth, layout, proveedores, admin). Siguen F2–F5 |
+| 5. Frontend (`apps/web`) | 🟡 F1 ✅ F2 ✅ (auth, proveedores, admin, subida de listas). Siguen F3–F5 |
 | 6. PDF parser | ✅ (adelantado; tablas + fallback LLM) |
 | Deploy (Docker en VPS / servidor propio) | ❌ No iniciado |
 
@@ -193,9 +193,9 @@
 - [x] `/admin/users/new`
 
 ### F2 — Importación
-- [ ] `/suppliers/:id/price-lists` — historial
-- [ ] `/suppliers/:id/price-lists/upload` — upload + ImportJobPoller
-- [ ] Toasts al completar/fallar importación
+- [x] `/suppliers/:id/price-lists` — historial
+- [x] `/suppliers/:id/price-lists/upload` — upload + ImportJobProgress (polling)
+- [x] Toasts al completar/fallar importación
 
 ### F3 — Catálogo
 - [ ] `/products` — tabla con todos los filtros
@@ -271,6 +271,15 @@
 - 23 archivos de test, 215 tests
 - Pendientes menores: notificación de import fallido, CRUD supplier products, índice compuesto de historial (markup en listing ✅ 2026-11-20)
 - ⚠️ `POST /markup-rules/bulk-update` reemplaza TODAS las reglas del commerce; `mds/markup.md` lo describe como "setear markup de un proveedor". Definir antes de usarlo desde el frontend
+
+### Pipeline real + F2 (2026-11-20)
+Bugs que solo aparecieron corriendo el pipeline de punta a punta (los unit tests mockeaban la cola):
+- Node escuchaba con un `Worker` (consumía jobs y no veía los de Python) → `QueueEvents` en `import.events.ts`
+- Worker Python crasheaba al arrancar (`waitUntilReady` no existe en bullmq Python)
+- `priceFormat` no llegaba al parser (siempre `decimal_point`)
+- Upload no verificaba que el proveedor fuera del commerce (aislamiento multi-tenant) ni que estuviera activo
+- Archivo > 20MB y errores de query → 500; ahora 413 / 400 (`error-handler.ts`)
+- El rewrite de Next cortaba uploads > 10MB
 
 ### Fix build (2026-03-12)
 - Errores de build corregidos (`import.worker.ts`, dependencia `@google-cloud/storage`)

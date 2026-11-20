@@ -1,5 +1,14 @@
 import { api } from "./client";
-import type { Commerce, Paginated, Role, Supplier, User } from "./types";
+import type {
+  Commerce,
+  ImportJob,
+  Paginated,
+  PriceFormat,
+  PriceList,
+  Role,
+  Supplier,
+  User,
+} from "./types";
 
 type Data<T> = { data: T };
 const unwrap = <T>(p: Promise<Data<T>>) => p.then((r) => r.data);
@@ -82,4 +91,32 @@ export const usersApi = {
     unwrap(api<Data<User>>("/admin/users", { method: "POST", body: input })),
   update: (id: string, input: Partial<UserCreateInput> & { isActive?: boolean }) =>
     unwrap(api<Data<User>>(`/admin/users/${id}`, { method: "PATCH", body: input })),
+};
+
+// ── Price lists & import (commerce scope) ────────────────────────────────────
+
+export interface UploadPriceListInput {
+  file: File;
+  priceFormat: PriceFormat;
+  effectiveDate?: string;
+  notes?: string;
+}
+
+export const importApi = {
+  listPriceLists: (supplierId: string, params: { page?: number; limit?: number }) =>
+    api<Paginated<PriceList>>(`/suppliers/${supplierId}/price-lists`, { query: { ...params } }),
+  upload: (supplierId: string, input: UploadPriceListInput) => {
+    const form = new FormData();
+    form.append("file", input.file);
+    form.append("priceFormat", input.priceFormat);
+    if (input.effectiveDate) form.append("effectiveDate", input.effectiveDate);
+    if (input.notes) form.append("notes", input.notes);
+    return unwrap(
+      api<Data<{ priceList: PriceList; importJob: ImportJob }>>(
+        `/suppliers/${supplierId}/price-lists/upload`,
+        { method: "POST", body: form },
+      ),
+    );
+  },
+  getJob: (id: string) => unwrap(api<Data<ImportJob>>(`/import-jobs/${id}`)),
 };

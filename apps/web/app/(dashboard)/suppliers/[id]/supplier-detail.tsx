@@ -1,8 +1,9 @@
 "use client";
 
 import { use, useState } from "react";
-import { PencilIcon, PowerIcon, PowerOffIcon } from "lucide-react";
+import { PencilIcon, PowerIcon, PowerOffIcon, UploadIcon } from "lucide-react";
 import { toast } from "sonner";
+import { PriceListTable } from "@/components/price-lists/price-list-table";
 import { ButtonLink } from "@/components/shared/button-link";
 import { ConfirmDialog } from "@/components/shared/confirm-dialog";
 import { PageHeader } from "@/components/shared/page-header";
@@ -83,6 +84,35 @@ export function SupplierDetail({ params }: { params: Promise<{ id: string }> }) 
           </>
         }
       />
+
+      <section aria-labelledby="price-lists-heading" className="mb-8">
+        <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+          <h2 id="price-lists-heading" className="text-lg font-semibold">
+            Listas de precios
+          </h2>
+          <div className="flex gap-2">
+            <ButtonLink href={`/suppliers/${supplier.id}/price-lists`} variant="ghost" size="sm">
+              Ver historial
+            </ButtonLink>
+            {supplier.isActive && (
+              <ButtonLink href={`/suppliers/${supplier.id}/price-lists/upload`} size="sm">
+                <UploadIcon />
+                Subir lista
+              </ButtonLink>
+            )}
+          </div>
+        </div>
+        <PriceListTable
+          supplierId={supplier.id}
+          limit={5}
+          paginate={false}
+          emptyAction={
+            supplier.isActive && (
+              <ButtonLink href={`/suppliers/${supplier.id}/price-lists/upload`}>Subir la primera lista</ButtonLink>
+            )
+          }
+        />
+      </section>
 
       <Card className="max-w-2xl">
         <CardHeader>

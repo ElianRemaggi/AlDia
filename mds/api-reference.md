@@ -467,40 +467,37 @@ Request: `multipart/form-data`
 
 | Campo | Tipo | Requerido | Descripción |
 |-------|------|-----------|-------------|
-| `file` | File | sí | Archivo (.xlsx, .xls, .csv). Máx 20MB |
-| `effective_date` | string (date) | no | Fecha desde cuando rige la lista |
-| `notes` | string | no | Nota libre |
-| `price_format` | `"decimal_point"` \| `"decimal_comma"` | no | Default: `decimal_point` |
+| `file` | File | sí | `.xlsx`, `.xls`, `.csv` o `.pdf`. Máx 20MB |
+| `effectiveDate` | string `YYYY-MM-DD` | no | Fecha desde cuando rige la lista |
+| `notes` | string | no | Nota libre (máx 1000) |
+| `priceFormat` | `"decimal_point"` \| `"decimal_comma"` | no | Cómo escribe los precios el archivo (`1,500.50` vs `1.500,50`). Default `decimal_point`. Se pasa al parser como `parserConfig.price_format` |
 
 ```json
-// Response 202 — Aceptado, procesando en background
+// Response 202 — aceptado, procesando en background
 {
   "status": "success",
   "data": {
-    "priceListId":    "550e8400-e29b-41d4-a716-446655440000",
-    "importJobId":    "7c9e6679-7425-40de-944b-e07fc1f90ae7",
-    "status":         "pending",
-    "sourceType":     "excel",
-    "sourceFileName": "lista_precios_marzo.xlsx",
-    "versionNumber":  3,
-    "message":        "File uploaded. Processing started."
+    "priceList": { "id": "uuid", "status": "pending", "versionNumber": 3, "sourceType": "excel", "sourceFileName": "lista.xlsx", "...": "..." },
+    "importJob": { "id": "uuid", "priceListId": "uuid", "status": "queued", "...": "..." }
   }
 }
 ```
 
-```json
-// Response 400 — archivo inválido
-{ "status": "error", "message": "Unsupported file type. Allowed: xlsx, xls, csv, pdf" }
-
-// Response 400 — archivo muy grande
-{ "status": "error", "message": "File too large. Maximum size is 20MB" }
-```
+| Error | Status | Mensaje |
+|---|---|---|
+| Sin archivo | 400 | `File is required` |
+| Tipo no soportado | 400 | `Unsupported file type. Allowed: xlsx, xls, csv, pdf` |
+| Más de 20MB | 413 | `File too large. Maximum size is 20MB` |
+| Proveedor de otro commerce / inexistente | 404 | `Supplier not found` |
+| Proveedor inactivo | 422 | `Supplier is inactive. Reactivate it to upload price lists.` |
 
 ---
 
 ### GET `/suppliers/:supplierId/price-lists`
 
-**Query params:** `page`, `limit`, `status` (`pending` | `processed` | `failed` | `partially_processed`)
+**Query params:** `page`, `limit`, `status` (`pending` | `processing` | `processed` | `failed` | `partially_processed`), `sortOrder` (default `DESC`)
+
+> No incluye `totalItems`; el resumen de filas de cada importación está en el `import_job` (`metaJson`).
 
 ```json
 // Response 200
@@ -517,7 +514,7 @@ Request: `multipart/form-data`
       "effectiveDate":  "2026-03-01",
       "uploadedAt":     "2026-03-12T10:00:00Z",
       "processedAt":    "2026-03-12T10:00:45Z",
-      "totalItems":     150
+      "notes":          null
     }
   ],
   "meta": { "total": 3, "page": 1, "limit": 20, "totalPages": 1 }
@@ -562,28 +559,9 @@ Request: `multipart/form-data`
 
 ### GET `/import-jobs/:id`
 
-Usado por el frontend para polling del estado de una importación (cada 3-5 segundos).
+Polling del estado de una importación (el frontend consulta cada 2s). `status`: `queued` → `running` → `completed` | `failed`.
 
 ```json
-// Response 200 — en progreso
-{
-  "status": "success",
-  "data": {
-    "id":          "uuid",
-    "priceListId": "uuid",
-    "jobType":     "parse_document",
-    "status":      "running",
-    "startedAt":   "2026-03-12T10:00:10Z",
-    "finishedAt":  null,
-    "errorMessage": null,
-    "metaJson": {
-      "total_rows":          150,
-      "processed_rows":      87,
-      "progress_percentage": 58
-    }
-  }
-}
-
 // Response 200 — completado
 {
   "status": "success",
@@ -593,23 +571,17 @@ Usado por el frontend para polling del estado de una importación (cada 3-5 segu
     "jobType":      "parse_document",
     "status":       "completed",
     "startedAt":    "2026-03-12T10:00:10Z",
-    "finishedAt":   "2026-03-12T10:00:45Z",
+    "finishedAt":   "2026-03-12T10:00:11Z",
     "errorMessage": null,
-    "metaJson": { "total_rows": 150, "processed_rows": 150, "progress_percentage": 100 }
+    "metaJson":     { "parser": "excel", "total_rows": 150, "error_count": 2 }
   }
 }
 
-// Response 200 — fallido
-{
-  "status": "success",
-  "data": {
-    "id":           "uuid",
-    "status":       "failed",
-    "errorMessage": "Column 'Precio' not found in any of the first 10 rows",
-    "finishedAt":   "2026-03-12T10:00:20Z"
-  }
-}
+// Response 200 — fallido (errorMessage viene del parser, en inglés)
+{ "status": "success", "data": { "id": "uuid", "status": "failed", "errorMessage": "File is not a zip file", "metaJson": null, "...": "..." } }
 ```
+
+`metaJson` es `null` hasta que el job termina bien. `total_rows` = filas importadas; `error_count` = filas que el parser no pudo leer (la lista queda `partially_processed`).
 
 ---
 

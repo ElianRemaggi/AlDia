@@ -8,6 +8,12 @@ const API_PROXY_TARGET = process.env.API_PROXY_TARGET ?? "http://localhost:4000"
 
 const nextConfig: NextConfig = {
   output: "standalone",
+  experimental: {
+    // The /api/v1 rewrite buffers request bodies (default cap 10MB, which silently
+    // truncated price-list uploads). The API allows 20MB and answers 413 above that,
+    // so let a bit more than 20MB through and keep the real limit in one place.
+    proxyClientMaxBodySize: "25mb",
+  },
   cacheComponents: true,
   partialPrefetching: true,
   turbopack: {

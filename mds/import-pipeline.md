@@ -39,7 +39,7 @@ El pipeline de importación es el núcleo del producto. Toma un archivo subido p
 [7] Python completa el job con returnValue = { status, parseResult }
       │
       ▼
-[8] Node Worker event: 'completed'
+[8] Node QueueEvents: 'completed' (import.events.ts)
       │  Recibe ParseResult
       │  Actualiza import_job → running
       ▼
@@ -95,32 +95,24 @@ CREATE TYPE "import_job_status_enum"      AS ENUM ('queued', 'running', 'complet
 
 ```typescript
 // apps/api/src/modules/import/import.queue.ts
-import { Queue, Worker } from 'bullmq';
-import { config } from '../../config';
-
-const connection = {
-  host:     config.redis.host,
-  port:     config.redis.port,
-  password: config.redis.password,
-};
-
 export const documentProcessingQueue = new Queue('document-processing', {
   connection,
   defaultJobOptions: {
     attempts: 2,
-    backoff:            { type: 'exponential', delay: 5000 },
-    removeOnComplete:   { age: 86400 },   // 24h
-    removeOnFail:       { age: 604800 },  // 7 días
+    backoff:          { type: 'exponential', delay: 5000 },
+    removeOnComplete: { age: 86400 },   // 24h
+    removeOnFail:     { age: 604800 },  // 7 días
   },
 });
 
-// Node no procesa jobs (Python es el worker), solo escucha eventos
-export const documentProcessingWorker = new Worker(
-  'document-processing',
-  async () => {},
-  { connection, autorun: false },
-);
+// Python es el ÚNICO consumidor de la cola. Node solo escucha eventos de la cola.
+export const documentProcessingEvents = new QueueEvents('document-processing', {
+  connection,
+  autorun: false,
+});
 ```
+
+> ⚠️ **No usar un `Worker` de Node para "escuchar" (bug corregido 2026-11-20).** Un `Worker` con procesador vacío + `run()` *consume* jobs compitiendo con Python (y los marcaba `failed` sin parsear), y sus eventos `completed`/`failed` solo cubren los jobs que ese mismo Worker procesó: los que procesaba Python nunca llegaban a Node y la lista quedaba `pending` para siempre. `QueueEvents` recibe los eventos de cualquier worker.
 
 ---
 
@@ -242,8 +234,9 @@ async def start_worker():
             }
         }
     )
+    # Python bullmq arranca a consumir al construir el Worker (autorun).
+    # No existe waitUntilReady() (eso es de la lib de Node): llamarlo crasheaba el worker.
     print("Document processor worker started.")
-    await worker.waitUntilReady()
     while True:
         await asyncio.sleep(1)
 
@@ -383,46 +376,17 @@ const versionNumber = (Number(max) || 0) + 1;
 
 ---
 
-## Node — Procesamiento del resultado (Worker events)
+## Node — Procesamiento del resultado (QueueEvents)
 
-```typescript
-// apps/api/src/modules/import/import.worker.ts
-documentProcessingWorker.on('completed', async (job, returnValue) => {
-  const { priceListId, status, parseResult, errorMessage } = returnValue;
+`apps/api/src/modules/import/import.events.ts` — `startImportEvents()` se llama en `server.ts` **después** de conectar la DB.
 
-  if (status === 'failed') {
-    await setPriceListStatus(priceListId, 'failed');
-    await setImportJobStatus(priceListId, 'failed', errorMessage);
-    return;
-  }
+| Evento (`QueueEvents`) | Handler | Efecto |
+|---|---|---|
+| `active` | `onJobActive(priceListId)` | `import_job` queued→running (+`startedAt`), `price_list` pending→processing. Updates **condicionales**: los handlers corren concurrentemente y un job rápido puede tener ya su estado final |
+| `completed` | `onJobCompleted(result)` | `returnvalue` llega como **string JSON** (`parseReturnValue`). Si Python devolvió `status: failed` → failed. Si no: saveParseResult → matchOrCreateProduct → createPriceListItems → detectPriceChanges → generateNotifications → `processed` / `partially_processed`; el job queda `completed` con `metaJson: { parser, total_rows, error_count }` (lo muestra el frontend) |
+| `failed` | `onJobFailed(priceListId, reason)` | Solo si `job.getState() === 'failed'` (el evento también se emite en intentos que BullMQ va a reintentar) |
 
-  await saveParseResults(priceListId, parseResult);
-
-  const priceList = await getPriceList(priceListId);
-  for (const row of parseResult.rows) {
-    const product = await matchOrCreateProduct(
-      priceList.supplierId,
-      priceList.commerceId,
-      row,
-    );
-    await createPriceListItem(priceListId, product.id, row);
-  }
-
-  await detectPriceChanges(priceListId, priceList.supplierId, priceList.commerceId);
-  await generateNotifications(priceList.commerceId, priceListId);
-
-  const finalStatus = parseResult.errors.length > 0 ? 'partially_processed' : 'processed';
-  await setPriceListStatus(priceListId, finalStatus, new Date());
-  await setImportJobStatus(priceListId, 'completed');
-});
-
-documentProcessingWorker.on('failed', async (job, error) => {
-  if (job) {
-    await setPriceListStatus(job.data.priceListId, 'failed');
-    await setImportJobStatus(job.data.priceListId, 'failed', error.message);
-  }
-});
-```
+El `jobId` de BullMQ es el `import_job.id`; el `priceListId` se lee de `job.data` con `Job.fromId`.
 
 ---
 
@@ -525,8 +489,8 @@ apps/api/src/modules/
     ├── import.routes.ts        ← POST upload, GET price-lists, GET price-list, GET import-job
     ├── import.controller.ts    ← handlers HTTP
     ├── import.service.ts       ← version_number, crear price_list + job, enqueue
-    ├── import.worker.ts        ← BullMQ Worker events: completed, failed
-    ├── import.queue.ts         ← Queue + Worker instances
+    ├── import.events.ts        ← QueueEvents: active, completed, failed
+    ├── import.queue.ts         ← Queue + QueueEvents
     ├── import.processor.ts     ← matchOrCreate, detectChanges, notifications
     ├── import.dto.ts           ← Zod schemas
     └── entities/

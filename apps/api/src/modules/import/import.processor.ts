@@ -176,6 +176,7 @@ export async function updateImportJobStatus(
   priceListId: string,
   status: ImportJobStatus,
   errorMessage?: string,
+  meta?: Record<string, unknown>,
 ): Promise<void> {
   const job = await importJobRepo().findOne({ where: { priceListId } });
   if (!job) return;
@@ -192,6 +193,10 @@ export async function updateImportJobStatus(
 
   if (errorMessage !== undefined) {
     job.errorMessage = errorMessage;
+  }
+
+  if (meta !== undefined) {
+    job.metaJson = { ...(job.metaJson ?? {}), ...meta };
   }
 
   await importJobRepo().save(job);

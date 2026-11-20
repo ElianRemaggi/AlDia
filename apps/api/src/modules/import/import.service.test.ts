@@ -23,6 +23,7 @@ import {
   getPriceList,
   getImportJob,
 } from './import.service';
+import { Supplier } from '../supplier/entities/supplier.entity';
 
 // ─── Fixtures ────────────────────────────────────────────────────────────────
 
@@ -76,6 +77,7 @@ describe('import.service', () => {
   let mockRepo: ReturnType<typeof createMockRepository> & {
     createQueryBuilder?: ReturnType<typeof vi.fn>;
   };
+  let supplierRepo: ReturnType<typeof createMockRepository>;
 
   beforeEach(() => {
     vi.clearAllMocks();
@@ -89,7 +91,11 @@ describe('import.service', () => {
     };
     mockRepo.createQueryBuilder = vi.fn().mockReturnValue(mockQb);
 
-    vi.mocked(AppDataSource.getRepository).mockReturnValue(mockRepo as never);
+    supplierRepo = createMockRepository();
+    supplierRepo.findOne.mockResolvedValue({ id: 'supplier-uuid-1', commerceId: 'commerce-uuid-1', isActive: true });
+    vi.mocked(AppDataSource.getRepository).mockImplementation(
+      (entity) => (entity === Supplier ? supplierRepo : mockRepo) as never,
+    );
   });
 
   // ─── uploadPriceList ────────────────────────────────────────────────────────
@@ -150,6 +156,26 @@ describe('import.service', () => {
       expect(result).toHaveProperty('importJob');
     });
 
+    it('should throw 404 when the supplier belongs to another commerce', async () => {
+      supplierRepo.findOne.mockResolvedValue(null);
+
+      await expect(
+        uploadPriceList('other-supplier', 'commerce-uuid-1', 'user-uuid-1', mockFile, {}),
+      ).rejects.toThrow('Supplier not found');
+      expect(supplierRepo.findOne).toHaveBeenCalledWith({
+        where: { id: 'other-supplier', commerceId: 'commerce-uuid-1' },
+      });
+      expect(documentProcessingQueue.add).not.toHaveBeenCalled();
+    });
+
+    it('should throw 422 when the supplier is inactive', async () => {
+      supplierRepo.findOne.mockResolvedValue({ id: 'supplier-uuid-1', isActive: false });
+
+      await expect(
+        uploadPriceList('supplier-uuid-1', 'commerce-uuid-1', 'user-uuid-1', mockFile, {}),
+      ).rejects.toThrow('Supplier is inactive');
+    });
+
     it('should throw 422 for unsupported file type', async () => {
       const docxFile = { ...mockFile, originalname: 'invoice.docx' } as Express.Multer.File;
 
@@ -175,14 +201,20 @@ describe('import.service', () => {
       vi.mocked(getFileUrl).mockResolvedValue('/uploads/lista.pdf');
       vi.mocked(documentProcessingQueue.add).mockResolvedValue({ id: 'job-uuid-1' } as never);
 
-      await uploadPriceList('supplier-uuid-1', 'commerce-uuid-1', 'user-uuid-1', pdfFile, {});
+      await uploadPriceList('supplier-uuid-1', 'commerce-uuid-1', 'user-uuid-1', pdfFile, {
+        priceFormat: 'decimal_comma',
+      });
 
       expect(mockRepo.create).toHaveBeenCalledWith(
         expect.objectContaining({ sourceType: 'pdf' }),
       );
       expect(documentProcessingQueue.add).toHaveBeenCalledWith(
         'parse-document',
-        expect.objectContaining({ sourceType: 'pdf', fileName: 'lista.pdf' }),
+        expect.objectContaining({
+          sourceType: 'pdf',
+          fileName: 'lista.pdf',
+          parserConfig: expect.objectContaining({ price_format: 'decimal_comma' }),
+        }),
         expect.any(Object),
       );
     });

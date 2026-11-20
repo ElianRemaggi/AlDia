@@ -176,6 +176,7 @@ AuthGate role="commerce" | "admin"   (layouts de (dashboard) y admin)
 - Rutas dinámicas: la page pasa `params` (Promise) al componente cliente dentro de `<Suspense>`, que lo resuelve con `use(params)`.
 - `usePathname` (nav activa) va dentro de `<Suspense>`.
 - Con `cacheComponents` Next preserva rutas visitadas con `<Activity>`: los componentes no se desmontan al navegar. **No usar `key={...updatedAt}` para resetear forms**: remonta el form y TanStack descarta los callbacks de `mutate()` (pasó en F1).
+- Rutas visitadas quedan montadas (ocultas) por `<Activity>`: en tests E2E, `getByText` puede matchear texto de una página oculta → acotar a `{ visible: true }` o a un contenedor.
 - Botones que navegan: `ButtonLink` (un `<Link>` real con estilos de botón). No usar `<Button render={<Link/>}>`: Base UI le pone `role="button"`.
 
 ---
@@ -406,11 +407,13 @@ Las páginas se construyen **en orden de disponibilidad de la API**:
 - [x] `/admin/users/new` — `POST /admin/users`
 - Verificado con Playwright contra build de producción + API real (21 escenarios).
 
-### Fase F2 — Con API Paso 3 (Import Pipeline)
-- [ ] `/suppliers/:id/price-lists` — historial de listas
-- [ ] `/suppliers/:id/price-lists/upload` — upload form + ImportJobPoller
-- [ ] Componente `ImportJobPoller` (polling cada 3s)
-- [ ] Toasts al completar/fallar importación
+### Fase F2 — ✅ Implementada (2026-11-20)
+- [x] Sección "Listas de precios" en `/suppliers/:id` (últimas 5) + `/suppliers/:id/price-lists` (historial paginado). Se refresca sola mientras haya importaciones en curso
+- [x] `/suppliers/:id/price-lists/upload` — drag & drop / file picker (xlsx, xls, csv, pdf; 20MB validado en el cliente), formato de precio (default coma decimal), vigencia, notas. Bloqueado si el proveedor está inactivo
+- [x] `ImportJobProgress` — polling de `GET /import-jobs/:id` cada 2s hasta `completed`/`failed`; muestra productos importados y filas con error (`metaJson`)
+- [x] Toasts al completar/fallar
+- Verificado con Playwright + pipeline real (API + worker Python + Redis): Excel ok, CSV parcial, archivo roto, drag & drop, proveedor inactivo.
+- `next.config.ts`: `experimental.proxyClientMaxBodySize: "25mb"` — el rewrite cortaba los uploads en 10MB.
 
 ### Fase F3 — Con API Paso 4 (Catálogo completo)
 - [ ] `/products` — tabla con todos los filtros

@@ -6,7 +6,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 **PriceHub** is a SaaS platform for centralizing supplier price lists. The `mds/` directory holds all architectural and feature docs.
 
-**Current state:** Steps 1–4 complete (backend done). `apps/api` has auth, commerce, supplier, import, catalog, commerce-product, markup, purchase and notification modules, 3 migrations and 249 unit tests; admin user CRUD in `modules/user` (`/admin/users`). `services/document-processor` has Excel/CSV/PDF parsers + BullMQ worker (Step 6 was done early: PDF tables via pdfplumber, LLM fallback via an OpenAI-compatible API, DeepSeek by default). **Step 5 (frontend) in progress:** `apps/web` exists with phase F1 done (login, layout, suppliers CRUD, admin commerces/users); next is F2 (price-list upload + import job polling). Production deploy is not started. Minor backend pending items are tracked in `mds/todo.md`.
+**Current state:** Steps 1–4 complete (backend done). `apps/api` has auth, commerce, supplier, import, catalog, commerce-product, markup, purchase and notification modules, 3 migrations and 249 unit tests; admin user CRUD in `modules/user` (`/admin/users`). `services/document-processor` has Excel/CSV/PDF parsers + BullMQ worker (Step 6 was done early: PDF tables via pdfplumber, LLM fallback via an OpenAI-compatible API, DeepSeek by default). **Step 5 (frontend) in progress:** `apps/web` has phases F1–F2 done (login, layout, suppliers CRUD, admin commerces/users, price-list upload with live import status); next is F3 (product catalog with markup, favorites, price history). Production deploy is not started. Minor backend pending items are tracked in `mds/todo.md`.
 
 **Deployment target:** Docker on a self-hosted VPS/server for the whole stack (web, api, processor, PostgreSQL, Redis). Do NOT use or add config for Railway, Vercel or Cloud Run. See `mds/deployment.md`.
 
@@ -68,7 +68,7 @@ Three-tier architecture with an async document processing microservice:
 
 3. **Multi-tenancy by `commerce_id`:** Every data table is scoped to a commerce. Suppliers are NOT shared between commerces. All service-layer queries must filter by `commerce_id`. Admins have cross-commerce access.
 
-4. **Async import pipeline via BullMQ:** File upload → GCS → `price_list` record (pending) → BullMQ job → Python worker parses → returns normalized JSON → Node backend creates `price_list_items` → change detection → notifications. Queue name: `document-processing`, concurrency: 2, timeout: 5 min, 1 retry.
+4. **Async import pipeline via BullMQ** (Node only *listens* via `QueueEvents` in `import.events.ts` — never add a Node `Worker` on this queue; Python is the sole consumer): File upload → GCS → `price_list` record (pending) → BullMQ job → Python worker parses → returns normalized JSON → Node backend creates `price_list_items` → change detection → notifications. Queue name: `document-processing`, concurrency: 2, timeout: 5 min, 1 retry.
 
 5. **Markup precedence:** `supplier_product` rule → `commerce_product` rule → `supplier` rule. Resolved at query time from `markup_rules` table.
 

@@ -18,8 +18,8 @@ async def start_worker():
         handle_job,
         {'connection': connection},
     )
+    # Python bullmq starts consuming on construction (autorun); there is no waitUntilReady().
     print('Document processor worker started. Listening on document-processing queue...')
-    await worker.waitUntilReady()
     try:
         while True:
             await asyncio.sleep(1)

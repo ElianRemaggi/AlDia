@@ -12,6 +12,13 @@ export const queryKeys = {
     all: ["commerces"] as const,
     detail: (id: string) => ["commerces", "detail", id] as const,
   },
+  priceLists: {
+    bySupplier: (supplierId: string) => ["price-lists", supplierId] as const,
+    list: (supplierId: string, params: object) => ["price-lists", supplierId, params] as const,
+  },
+  importJobs: {
+    detail: (id: string) => ["import-jobs", id] as const,
+  },
   users: {
     all: ["users"] as const,
     list: (params: UserListParams) => ["users", "list", params] as const,
