@@ -9,7 +9,7 @@
 - File-based routing reduces boilerplate
 - API routes available as fallback (though main API is Express)
 - Strong TypeScript support
-- Easy deployment on Vercel
+- `output: "standalone"` permite una imagen Docker liviana (deploy en servidor propio)
 
 **Why Tailwind CSS:**
 - Utility-first approach speeds up UI development
@@ -125,15 +125,13 @@ apps/api/
 
 ### Deployment
 
-**Frontend:** Vercel
-- Zero-config Next.js deployment
-- Preview deployments per PR
-- Edge network for static assets
-
-**Backend + Services:** Docker + VPS/Cloud Run
-- docker-compose for local development
-- Single Dockerfile per service
-- Environment-based configuration
+**Todo el stack:** Docker en VPS / servidor propio (decisión 2026-11-20; se descartan Railway, Vercel y Cloud Run)
+- Un Dockerfile por servicio: `apps/web` (Next.js standalone), `apps/api`, `services/document-processor`
+- `docker-compose.prod.yml` con reverse proxy (Caddy/Nginx + TLS), PostgreSQL y Redis en containers
+- docker-compose para desarrollo local (solo infraestructura)
+- Configuración por variables de entorno
+- Control total del costo y de los datos; sin dependencia de un PaaS
+- Detalle en `deployment.md`
 
 ### Development Tools
 

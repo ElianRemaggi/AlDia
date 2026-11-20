@@ -5,6 +5,18 @@
 - [x] Completed
 - [~] In Progress
 
+## Estado general (actualizado 2026-11-20)
+
+| Paso (`ordenDesarrollo.md`) | Estado |
+|---|---|
+| 1. DB + API (auth + suppliers) | ✅ |
+| 2. Document Processor (Excel/CSV) | ✅ |
+| 3. Import Pipeline (API + BullMQ + Python) | ✅ |
+| 4. Remaining API (catálogo, markup, compras, notificaciones) | ✅ (con pendientes menores) |
+| 5. Frontend (`apps/web`) | ❌ No iniciado |
+| 6. PDF parser | ❌ No iniciado |
+| Deploy (Docker en VPS / servidor propio) | ❌ No iniciado |
+
 ---
 
 ## Phase 1: Foundation ✅
@@ -59,18 +71,18 @@
 - [x] SupplierProduct entity + migration (Paso 3) ✅
 - [ ] CRUD endpoints: GET /suppliers/:id/products, POST, GET/:pid, PATCH/:pid
 
-### 2.3 File Upload
-- [x] Multer configuration for file upload ✅
-- [x] Storage dual: local `./uploads/` en dev, GCS en prod — `shared/storage/storage.ts` ✅
-- [x] File type validation (xlsx, xls, csv) ✅
-- [x] File size limit (20MB) ✅
+### 2.3 File Upload ✅
+- [x] Multer configuration for file upload
+- [x] Storage dual: local `./uploads/` en dev, GCS en prod — `shared/storage/storage.ts`
+- [x] File type validation (xlsx, xls, csv)
+- [x] File size limit (20MB)
 
-### 2.4 Import Pipeline — Infrastructure (Paso 3)
-- [x] BullMQ queue setup — `modules/import/import.queue.ts` ✅
-- [x] Import job creation flow ✅
-- [x] Job status tracking endpoint (GET /import-jobs/:id) ✅
-- [x] Python worker — `services/document-processor/worker/` ✅
-- [x] Communication protocol documentado en `mds/import-pipeline.md` ✅
+### 2.4 Import Pipeline — Infrastructure (Paso 3) ✅
+- [x] BullMQ queue setup — `modules/import/import.queue.ts`
+- [x] Import job creation flow
+- [x] Job status tracking endpoint (GET /import-jobs/:id)
+- [x] Python worker — `services/document-processor/worker/`
+- [x] Communication protocol documentado en `mds/import-pipeline.md`
 
 ### 2.5 Parsers — Excel/CSV ✅
 - [x] Python: Excel parser (openpyxl)
@@ -85,83 +97,84 @@
 - [ ] Handle multi-page PDFs
 
 ### 2.7 Import Pipeline — Processing (Paso 3) ✅
-- [x] Segunda migración: price_lists, price_list_items, import_jobs, price_change_events, import_parse_results ✅
-- [x] POST /suppliers/:id/price-lists/upload ✅
-- [x] Node Worker events: completed / failed ✅
-- [x] matchOrCreateProduct (por código, luego nombre normalizado) ✅
-- [x] createPriceListItems (inmutables) ✅
-- [x] detectPriceChanges ✅
-- [ ] generateNotifications (favoritos) — requiere commerce_product_supplier_links (Paso 4)
-- [x] Store import_parse_results ✅
+- [x] Segunda migración: price_lists, price_list_items, import_jobs, price_change_events, import_parse_results
+- [x] POST /suppliers/:id/price-lists/upload
+- [x] Node Worker events: completed / failed
+- [x] matchOrCreateProduct (por código, luego nombre normalizado)
+- [x] createPriceListItems (inmutables)
+- [x] detectPriceChanges
+- [x] generateNotifications (import finished, price change, favorite price change) — Paso 4
+- [x] Store import_parse_results
 
 ---
 
-## Phase 3: Price Intelligence (API Paso 4)
+## Phase 3: Price Intelligence (API Paso 4) ✅
 
 ### 3.1 Change Detection
-- [ ] price_change_events ya creados en pipeline — endpoints de consulta
-- [ ] GET /products/:id/changes
+- [x] price_change_events creados en pipeline
+- [x] GET /products/:id/changes
 
 ### 3.2 Price History
-- [ ] GET /products/:id/price-history endpoint
-- [ ] Optimización: índice en (supplier_product_id, created_at)
+- [x] GET /products/:id/price-history
+- [ ] Optimización: índice compuesto en price_list_items (supplier_product_id, created_at) — hoy solo hay índice simple en supplier_product_id
 
 ### 3.3 Product Listing
-- [ ] GET /products — vista cross-supplier con precio actual, cambio %, favorito
-- [ ] Filtros: search, supplier_id, category, is_favorite, has_recent_change, price range
-- [ ] Sort: name, price, change_percentage
-- [ ] Paginación
+- [x] GET /products — vista cross-supplier con precio actual, cambio %, favorito
+- [x] Filtros, sort y paginación
+- [x] GET /products/:id
 
 ### 3.4 Favorites
-- [ ] POST /products/:id/favorite
-- [ ] DELETE /products/:id/favorite
-- [ ] Filtro `is_favorite` en product listing
+- [x] POST /products/:id/favorite
+- [x] DELETE /products/:id/favorite
+- [x] Filtro `is_favorite` en product listing
 
 ---
 
 ## Phase 4: Commerce Operations (API Paso 4)
 
-### 4.1 Commerce Products
-- [ ] commerce_products entity + migration
-- [ ] CRUD: GET /commerce-products, POST, GET/:id, PATCH/:id, DELETE/:id
+### 4.1 Commerce Products ✅
+- [x] commerce_products entity + migration (`1710000000002-CatalogAndCommerce`)
+- [x] CRUD: GET /commerce-products, POST, GET/:id, PATCH/:id, DELETE/:id
 
-### 4.2 Product Linking
-- [ ] POST /commerce-products/:id/links
-- [ ] DELETE /commerce-products/:id/links/:linkId
+### 4.2 Product Linking ✅
+- [x] POST /commerce-products/:id/links
+- [x] DELETE /commerce-products/:id/links/:linkId
 
 ### 4.3 Markup Rules
-- [ ] markup_rules entity + migration
-- [ ] CRUD: GET /markup-rules, POST, PATCH/:id, DELETE/:id
-- [ ] POST /markup-rules/bulk-update
-- [ ] Lógica de precedencia en product listing (supplier_product > commerce_product > supplier)
+- [x] markup_rules entity + migration
+- [x] CRUD: GET /markup-rules, POST, PATCH/:id, DELETE/:id
+- [x] POST /markup-rules/bulk-update
+- [x] `resolveMarkup()` en `markup.service.ts` (precedencia supplier_product > commerce_product > supplier)
+- [ ] Aplicar `resolveMarkup` en el product listing (`catalog.service.ts` todavía no lo usa)
 
 ---
 
 ## Phase 5: Purchase & Notifications (API Paso 4)
 
-### 5.1 Purchase Lists
-- [ ] purchase_lists + purchase_list_items entities + migration
-- [ ] CRUD: GET /purchase-lists, POST, GET/:id, PATCH/:id, DELETE/:id
-- [ ] POST /purchase-lists/:id/items, PATCH/:id/items/:itemId, DELETE/:id/items/:itemId
-- [ ] PATCH /purchase-lists/:id/status (draft → exported → archived)
+### 5.1 Purchase Lists ✅
+- [x] purchase_lists + purchase_list_items entities + migration
+- [x] CRUD: GET /purchase-lists, POST, GET/:id, PATCH/:id, DELETE/:id
+- [x] POST /purchase-lists/:id/items, PATCH/:id/items/:itemId, DELETE/:id/items/:itemId
+- [x] Cambio de status (draft → exported → archived) vía PATCH /purchase-lists/:id
 
-### 5.2 WhatsApp Export
-- [ ] GET /purchase-lists/:id/export/whatsapp
-- [ ] Formato: agrupado por proveedor, texto plano
+### 5.2 WhatsApp Export ✅
+- [x] GET /purchase-lists/:id/export/whatsapp
+- [x] Formato: agrupado por proveedor, texto plano
 
 ### 5.3 Notifications
-- [ ] notifications entity + migration
-- [ ] GET /notifications, GET /notifications/unread-count
-- [ ] PATCH /notifications/:id/read, POST /notifications/mark-all-read
-- [ ] Creación automática en: import completed/failed, price change en favorito
+- [x] notifications entity + migration
+- [x] GET /notifications, GET /notifications/unread-count
+- [x] PATCH /notifications/:id/read, POST /notifications/mark-all-read
+- [x] Creación automática en: import completed, price change, price change en favorito
+- [ ] Notificación al fallar una importación (hoy solo se marca el job/price_list como failed)
 
 ---
 
 ## Phase 6: Frontend (Paso 5)
 
-> Ver plan detallado en `mds/frontend.md`
+> Ver plan detallado en `mds/frontend.md`. Toda la API que necesita F1–F4 ya está disponible.
 
-### F1 — Disponible ahora (API Paso 1 lista)
+### F1 — Base
 - [ ] Setup `apps/web` (Next.js + Tailwind + shadcn/ui)
 - [ ] `lib/api/client.ts` — fetch wrapper con refresh interceptor
 - [ ] `lib/auth/` — AuthProvider, token-store, useAuth
@@ -173,20 +186,20 @@
 - [ ] `/suppliers/:id` — detalle
 - [ ] `/admin/commerces` — lista + toggle isActive
 - [ ] `/admin/commerces/new` y `/:id/edit`
-- [ ] `/admin/users` — lista
+- [ ] `/admin/users` — lista (requiere endpoints de 1.4)
 - [ ] `/admin/users/new`
 
-### F2 — Tras API Paso 3 (Import Pipeline)
+### F2 — Importación
 - [ ] `/suppliers/:id/price-lists` — historial
 - [ ] `/suppliers/:id/price-lists/upload` — upload + ImportJobPoller
 - [ ] Toasts al completar/fallar importación
 
-### F3 — Tras API Paso 4 (Catálogo)
+### F3 — Catálogo
 - [ ] `/products` — tabla con todos los filtros
 - [ ] Toggle favorito con optimistic update
 - [ ] `/products/:id` — detalle + gráfico historial de precios
 
-### F4 — Tras API Paso 5 (Compras + Notificaciones)
+### F4 — Compras + Notificaciones
 - [ ] `/purchase-lists` — lista y creación
 - [ ] `/purchase-lists/:id` — items inline edit + export WhatsApp
 - [ ] `NotificationBell` en header con polling 30s
@@ -205,39 +218,56 @@
 ## Phase 7: Quality & Deploy
 
 ### 7.1 Quality
-- [ ] Unit tests: change detection, markup precedence, export format
+- [x] Unit tests: change detection, markup precedence, export format
 - [ ] API integration tests: auth flow, import pipeline
 - [ ] E2E: upload → productos → lista de compra → export
 - [ ] Performance: product listing con 1000+ productos
 
-### 7.2 Deploy
+### 7.2 Deploy — Docker en VPS / servidor propio
+
+> Decisión (2026-11-20): se descarta Railway y Vercel. Todo se despliega con Docker en un VPS o servidor propio. Ver `mds/deployment.md`.
+
+- [ ] Dockerfile `apps/api` (multi-stage, pnpm workspace)
+- [ ] Dockerfile `services/document-processor`
+- [ ] Dockerfile `apps/web` (Next.js standalone output)
+- [ ] `docker-compose.prod.yml`: web, api, processor, postgres, redis, reverse proxy
+- [ ] Reverse proxy con HTTPS (Caddy o Nginx + Let's Encrypt)
+- [ ] Migraciones automáticas al arrancar la API
+- [ ] Backups de PostgreSQL + volumen de uploads
+- [ ] Endpoint `GET /health` (DB + Redis)
+- [ ] CI/CD: build de imágenes → registry → deploy al servidor
 - [ ] Setup staging environment
-- [ ] CI/CD pipeline
-- [ ] Frontend → Vercel
-- [ ] Backend + services → Docker (VPS o Cloud Run)
-- [ ] Migrations en staging
 - [ ] Monitoring: health check, Sentry, logs
 
 ---
 
 ## Review Notes
 
-### Paso 1 ✅ (completado)
+### Paso 1 ✅
 - auth, commerce, supplier modules con tests
 - Migración inicial: commerces, users, suppliers
-- Pendiente menor: rate limiting en auth, DELETE /admin/users
+- Pendiente menor: rate limiting en auth, CRUD /admin/users
 
-### Paso 2 ✅ (completado)
+### Paso 2 ✅
 - ExcelParser + CsvParser implementados y testeados
 - Auto-detección de headers y columnas
 - Normalización de precios ARS y decimal_point
 
-### Paso 3 ✅ (completado — 2026-03-12)
+### Paso 3 ✅ (2026-03-12)
 - 6 entidades: SupplierProduct, PriceList, PriceListItem, ImportJob, ImportParseResult, PriceChangeEvent
 - Migración 1710000000001-ImportPipeline (4 enums, 6 tablas, índices)
 - Storage dual: local en dev, GCS en prod (`shared/storage/storage.ts`)
 - Módulo import completo: service, processor, worker, controller, routes, dto
 - BullMQ Queue + Worker (Node escucha eventos, Python procesa)
 - Python worker: bullmq_worker.py + job_handler.py
-- 30 tests nuevos, 142 tests totales ✅
-- Pendiente menor: generateNotifications para favoritos (requiere Paso 4)
+
+### Paso 4 ✅ (2026-03-12)
+- Módulos nuevos: catalog, commerce-product, markup, purchase, notification
+- Migración 1710000000002-CatalogAndCommerce
+- generateNotifications conectado al worker de importación
+- 23 archivos de test, 215 tests
+- Pendientes menores: aplicar markup en listing, notificación de import fallido, CRUD supplier products, índice compuesto de historial
+
+### Fix build (2026-03-12)
+- Errores de build corregidos (`import.worker.ts`, dependencia `@google-cloud/storage`)
+- La config de Railway que se agregó en ese commit fue eliminada (2026-11-20): el deploy será con Docker en servidor propio

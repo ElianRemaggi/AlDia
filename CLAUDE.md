@@ -6,7 +6,9 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 **PriceHub** is a SaaS platform for centralizing supplier price lists. The `mds/` directory holds all architectural and feature docs.
 
-**Current state:** Step 1 complete — `apps/api` has auth, commerce, and supplier modules with migrations and tests. `apps/web` and `services/document-processor` do not exist yet.
+**Current state:** Steps 1–4 complete (backend done). `apps/api` has auth, commerce, supplier, import, catalog, commerce-product, markup, purchase and notification modules, 3 migrations and 215 unit tests. `services/document-processor` has Excel/CSV parsers + BullMQ worker. **Next: Step 5 (frontend) — `apps/web` does not exist yet.** Step 6 (PDF parser) and production deploy are not started. Minor backend pending items are tracked in `mds/todo.md`.
+
+**Deployment target:** Docker on a self-hosted VPS/server for the whole stack (web, api, processor, PostgreSQL, Redis). Do NOT use or add config for Railway, Vercel or Cloud Run. See `mds/deployment.md`.
 
 ## Development Order
 
@@ -51,7 +53,7 @@ pnpm lint
 Three-tier architecture with an async document processing microservice:
 
 - **`apps/web`** — Next.js + TypeScript + Tailwind + shadcn/ui. State via TanStack Query (server state) + React useState (local UI).
-- **`apps/api`** — Express.js + TypeScript + TypeORM. REST API on port 4000. Modular structure under `src/modules/` (auth, commerce, supplier; catalog/import/purchase/notification planned). Path alias `@/` → `src/`. Each module follows the pattern: `{module}.controller.ts`, `{module}.service.ts`, `{module}.routes.ts`, `{module}.dto.ts`, `entities/{module}.entity.ts`. Shared middleware in `src/shared/middleware/`. Test fixtures/mocks in `src/test/`.
+- **`apps/api`** — Express.js + TypeScript + TypeORM. REST API on port 4000. Modular structure under `src/modules/` (auth, commerce, supplier, import, catalog, commerce-product, markup, purchase, notification). Path alias `@/` → `src/`. Each module follows the pattern: `{module}.controller.ts`, `{module}.service.ts`, `{module}.routes.ts`, `{module}.dto.ts`, `entities/{module}.entity.ts`. Shared middleware in `src/shared/middleware/`. Test fixtures/mocks in `src/test/`.
 - **`services/document-processor`** — Python microservice. Polls BullMQ queue via Redis, parses files, returns normalized JSON.
 - **`packages/shared`** — Shared TypeScript types and constants between frontend and backend.
 
@@ -111,6 +113,7 @@ All detailed documentation lives in `mds/`:
 | Frontend planning detallado | `mds/frontend.md` |
 | Environment variables | `mds/env-vars.md` |
 | Development roadmap | `mds/todo.md` |
+| Deployment (Docker, self-hosted) | `mds/deployment.md` |
 
 ## Environment Variables
 

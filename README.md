@@ -24,7 +24,7 @@ Los comercios reciben listas de precios en formatos dispares (PDF, Excel, imáge
 - **Colas:** Redis + BullMQ
 - **Almacenamiento de archivos:** Google Cloud Storage (Firestore)
 - **Autenticación:** JWT
-- **Deploy:** Vercel (frontend) + Docker (backend/servicios)
+- **Deploy:** Docker en VPS / servidor propio (frontend, backend y servicios)
 
 ## Estructura del Proyecto
 
