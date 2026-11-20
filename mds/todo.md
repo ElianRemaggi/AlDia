@@ -54,7 +54,7 @@
 
 ### 1.4 Admin Basics
 - [x] CRUD endpoints for commerces (GET, POST, GET/:id, PATCH/:id)
-- [ ] CRUD endpoints for users (admin only) — GET/PATCH/DELETE /admin/users
+- [x] CRUD endpoints for users (admin only) — `modules/user/`, GET/POST/GET:id/PATCH/DELETE (soft) `/admin/users`; `/auth/register` delega en el mismo servicio
 - [x] Input validation with zod
 
 ---
@@ -147,8 +147,8 @@
 - [x] markup_rules entity + migration
 - [x] CRUD: GET /markup-rules, POST, PATCH/:id, DELETE/:id
 - [x] POST /markup-rules/bulk-update
-- [x] `resolveMarkup()` en `markup.service.ts` (precedencia supplier_product > commerce_product > supplier)
-- [ ] Aplicar `resolveMarkup` en el product listing (`catalog.service.ts` todavía no lo usa)
+- [x] `pickMarkupRule()` / `applyMarkup()` en `markup.service.ts` (precedencia supplier_product > commerce_product > supplier)
+- [x] Markup aplicado en `GET /products` y `GET /products/:id` → `markupPercentage`, `salePrice`
 
 ---
 
@@ -189,7 +189,7 @@
 - [ ] `/suppliers/:id` — detalle
 - [ ] `/admin/commerces` — lista + toggle isActive
 - [ ] `/admin/commerces/new` y `/:id/edit`
-- [ ] `/admin/users` — lista (requiere endpoints de 1.4)
+- [ ] `/admin/users` — lista
 - [ ] `/admin/users/new`
 
 ### F2 — Importación
@@ -249,7 +249,7 @@
 ### Paso 1 ✅
 - auth, commerce, supplier modules con tests
 - Migración inicial: commerces, users, suppliers
-- Pendiente menor: rate limiting en auth, CRUD /admin/users
+- Pendiente menor: rate limiting en auth (CRUD /admin/users ✅ 2026-11-20)
 
 ### Paso 2 ✅
 - ExcelParser + CsvParser implementados y testeados
@@ -269,7 +269,8 @@
 - Migración 1710000000002-CatalogAndCommerce
 - generateNotifications conectado al worker de importación
 - 23 archivos de test, 215 tests
-- Pendientes menores: aplicar markup en listing, notificación de import fallido, CRUD supplier products, índice compuesto de historial
+- Pendientes menores: notificación de import fallido, CRUD supplier products, índice compuesto de historial (markup en listing ✅ 2026-11-20)
+- ⚠️ `POST /markup-rules/bulk-update` reemplaza TODAS las reglas del commerce; `mds/markup.md` lo describe como "setear markup de un proveedor". Definir antes de usarlo desde el frontend
 
 ### Fix build (2026-03-12)
 - Errores de build corregidos (`import.worker.ts`, dependencia `@google-cloud/storage`)

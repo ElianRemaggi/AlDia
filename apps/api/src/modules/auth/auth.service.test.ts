@@ -96,7 +96,7 @@ describe('auth.service', () => {
       mockRepo.save.mockImplementation(async (e: unknown) => e);
 
       await register({
-        name: 'New', email: 'new@test.com', password: 'mypass', role: 'commerce',
+        name: 'New', email: 'new@test.com', password: 'mypass', role: 'admin',
       });
 
       expect(bcrypt.hash).toHaveBeenCalledWith('mypass', 12);
@@ -110,7 +110,7 @@ describe('auth.service', () => {
       }));
 
       const result = await register({
-        name: 'New', email: 'new@test.com', password: 'mypass', role: 'commerce',
+        name: 'New', email: 'new@test.com', password: 'mypass', role: 'admin',
       });
 
       expect(result).not.toHaveProperty('passwordHash');

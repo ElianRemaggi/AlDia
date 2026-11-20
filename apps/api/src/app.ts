@@ -14,6 +14,7 @@ import commerceProductRoutes from './modules/commerce-product/commerce-product.r
 import markupRoutes from './modules/markup/markup.routes';
 import purchaseRoutes from './modules/purchase/purchase.routes';
 import notificationRoutes from './modules/notification/notification.routes';
+import adminUserRoutes from './modules/user/user.routes';
 
 const app = express();
 
@@ -39,6 +40,7 @@ app.use('/api/v1/commerce-products', commerceProductRoutes);
 app.use('/api/v1/markup-rules', markupRoutes);
 app.use('/api/v1/purchase-lists', purchaseRoutes);
 app.use('/api/v1/notifications', notificationRoutes);
+app.use('/api/v1/admin/users', adminUserRoutes);
 
 // Error handling
 app.use(errorHandler);

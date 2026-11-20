@@ -32,7 +32,7 @@ Base URL: `http://localhost:4000/api/v1`
 | Método | Ruta | Auth | Rol |
 |--------|------|------|-----|
 | POST | `/auth/login` | — | — |
-| POST | `/auth/register` | Bearer | admin |
+| POST | `/auth/register` | Bearer | admin (equivale a `POST /admin/users`) |
 | POST | `/auth/refresh` | Cookie | — |
 | POST | `/auth/logout` | Bearer | — |
 | GET  | `/auth/me` | Bearer | — |
@@ -77,7 +77,7 @@ El `refreshToken` se setea como cookie `httpOnly` con `path=/api/v1/auth/refresh
   "email": "user@example.com",
   "password": "minimo6chars",
   "role": "commerce",         // "admin" | "commerce"
-  "commerceId": "uuid"        // requerido si role = "commerce"
+  "commerceId": "uuid"        // requerido si role = "commerce" (ver reglas en Admin Users)
 }
 
 // Response 201
@@ -217,6 +217,87 @@ Todos los campos son opcionales.
 
 ---
 
+## Admin Users
+
+Todos los endpoints requieren rol `admin`. Montados en `/admin/users`. Las respuestas nunca incluyen `passwordHash`.
+
+| Método | Ruta | Descripción |
+|--------|------|-------------|
+| GET    | `/admin/users` | Listar usuarios (paginado, filtros) |
+| POST   | `/admin/users` | Crear usuario |
+| GET    | `/admin/users/:id` | Obtener usuario (incluye `commerce`) |
+| PATCH  | `/admin/users/:id` | Actualizar usuario |
+| DELETE | `/admin/users/:id` | Desactivar usuario (soft delete: `isActive = false`) |
+
+**Reglas (también aplican a `POST /auth/register`):**
+- `email` único → `409 Email already in use`
+- `role = "commerce"` requiere `commerceId` de un commerce existente (`422`) y sin otro usuario activo (`409 Commerce already has an active user` — MVP: un usuario por commerce)
+- `role = "admin"` → `commerceId` siempre `null`
+- Un admin no puede desactivarse ni cambiarse el rol a sí mismo (`422`)
+- Reactivar un usuario (`isActive: true`) vuelve a validar que su commerce no tenga otro usuario activo
+
+---
+
+### GET `/admin/users`
+
+**Query params:** `page` (default 1), `limit` (default 20, max 100), `role` (`admin` | `commerce`), `commerceId`, `search` (nombre o email, ILIKE), `isActive` (`true` | `false`). Parámetros inválidos → `400`.
+
+```json
+// Response 200
+{
+  "status": "success",
+  "data": [
+    {
+      "id": "uuid",
+      "name": "Ana Pérez",
+      "email": "ana@almacen.com",
+      "role": "commerce",
+      "commerceId": "uuid",
+      "isActive": true,
+      "createdAt": "2026-03-01T00:00:00Z",
+      "updatedAt": "2026-03-01T00:00:00Z",
+      "commerce": { "id": "uuid", "name": "Almacén Don Pedro", "...": "..." }
+    }
+  ],
+  "meta": { "total": 1, "page": 1, "limit": 20, "totalPages": 1 }
+}
+```
+
+---
+
+### POST `/admin/users`
+
+Mismo body que `POST /auth/register`. Response `201` con el usuario creado.
+
+---
+
+### PATCH `/admin/users/:id`
+
+Todos los campos son opcionales, pero el body no puede estar vacío (`400`). `password` se re-hashea.
+
+```json
+// Request
+{
+  "name": "Ana P.",
+  "email": "ana@nuevo.com",
+  "password": "nueva123",
+  "role": "commerce",
+  "commerceId": "uuid",
+  "isActive": true
+}
+
+// Response 200
+{ "status": "success", "data": { ...usuario actualizado } }
+```
+
+---
+
+### DELETE `/admin/users/:id`
+
+Soft delete. Response `200` con el usuario (`isActive: false`). El usuario ya no puede hacer login ni refrescar su token; un access token emitido antes sigue siendo válido hasta que expire (15 min).
+
+---
+
 ## Suppliers
 
 Todos los endpoints requieren autenticación. Las operaciones se filtran automáticamente por `commerceId` del usuario autenticado.
@@ -337,6 +418,20 @@ Soft delete: setea `isActive = false`. No elimina el registro.
 // Response 404
 { "status": "error", "message": "Supplier not found" }
 ```
+
+---
+
+## Products — campos de precio
+
+`GET /products` y `GET /products/:id` agregan a cada producto:
+
+| Campo | Tipo | Descripción |
+|-------|------|-------------|
+| `unitCost` | string \| null | Costo del proveedor según la última lista procesada |
+| `markupPercentage` | number \| null | Markup aplicado, resuelto por precedencia `supplier_product` → `commerce_product` (si el producto está vinculado) → `supplier`. `null` si no hay regla |
+| `salePrice` | number \| null | `unitCost × (1 + markupPercentage / 100)`, redondeado a 2 decimales. `null` si falta costo o regla |
+| `changePercentage` | string \| null | Último cambio de precio detectado |
+| `isFavorite` | boolean | Si el producto está marcado como favorito |
 
 ---
 

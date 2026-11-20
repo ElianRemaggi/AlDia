@@ -5,6 +5,7 @@ import { config } from '../../config';
 import { User } from './entities/user.entity';
 import { AppError } from '../../shared/middleware';
 import { LoginDto, RegisterDto } from './auth.dto';
+import { createUser } from '../user/user.service';
 
 const userRepo = () => AppDataSource.getRepository(User);
 
@@ -44,25 +45,9 @@ export async function login(dto: LoginDto) {
   return { user: userWithoutPassword, accessToken, refreshToken };
 }
 
+/** Kept for backwards compatibility; same rules as POST /admin/users. */
 export async function register(dto: RegisterDto) {
-  const existing = await userRepo().findOne({ where: { email: dto.email } });
-  if (existing) {
-    throw new AppError('Email already in use', 409);
-  }
-
-  const passwordHash = await bcrypt.hash(dto.password, 12);
-  const user = userRepo().create({
-    name: dto.name,
-    email: dto.email,
-    passwordHash,
-    role: dto.role,
-    commerceId: dto.commerceId ?? null,
-  });
-
-  await userRepo().save(user);
-
-  const { passwordHash: _, ...userWithoutPassword } = user;
-  return userWithoutPassword;
+  return createUser(dto);
 }
 
 export async function refresh(refreshToken: string) {

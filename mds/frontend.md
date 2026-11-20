@@ -444,7 +444,7 @@ export function useImportJobPoller(jobId: string | null) {
 
 #### `/admin/users/new`
 - Campos: nombre*, email*, password*, rol*, commerce (si rol = commerce)
-- API: `POST /auth/register`
+- API: `POST /admin/users` (mismas reglas que `/auth/register`)
 
 ---
 
@@ -466,7 +466,7 @@ Estas páginas pueden construirse e integrarse hoy:
 - [ ] `/admin/commerces` — lista + toggle isActive
 - [ ] `/admin/commerces/new` y `edit`
 - [ ] `/admin/users` — lista
-- [ ] `/admin/users/new` — crear usuario via `/auth/register`
+- [ ] `/admin/users/new` — crear usuario via `POST /admin/users`
 
 ### Fase F2 — Con API Paso 3 (Import Pipeline)
 - [ ] `/suppliers/:id/price-lists` — historial de listas

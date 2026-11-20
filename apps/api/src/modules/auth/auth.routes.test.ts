@@ -116,7 +116,7 @@ describe('auth routes', () => {
       const res = await request(app)
         .post('/api/v1/auth/register')
         .set('Authorization', 'Bearer valid-token')
-        .send({ name: 'New', email: 'new@test.com', password: 'pass123', role: 'commerce' });
+        .send({ name: 'New', email: 'new@test.com', password: 'pass123', role: 'admin' });
 
       expect(res.status).toBe(201);
       expect(res.body.data.email).toBe('new@test.com');

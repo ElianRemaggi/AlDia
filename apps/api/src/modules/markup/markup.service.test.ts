@@ -14,7 +14,10 @@ import {
   deleteMarkupRule,
   bulkUpdateMarkupRules,
   resolveMarkup,
+  pickMarkupRule,
+  applyMarkup,
 } from './markup.service';
+import type { MarkupRule } from './entities/markup-rule.entity';
 import { MarkupScopeType } from './entities/markup-rule.entity';
 
 describe('markup.service', () => {
@@ -245,6 +248,54 @@ describe('markup.service', () => {
       );
 
       expect(result).toBeNull();
+    });
+  });
+  describe('pickMarkupRule', () => {
+    const target = { supplierId: 'supplier-uuid-1', supplierProductId: 'sp-1', commerceProductId: 'cp-1' };
+    const supplierRule = createMarkupRuleFixture({ markupPercentage: '10.00' }) as unknown as MarkupRule;
+    const commerceProductRule = createMarkupRuleFixture({
+      scopeType: MarkupScopeType.COMMERCE_PRODUCT,
+      supplierId: null,
+      commerceProductId: 'cp-1',
+      markupPercentage: '20.00',
+    }) as unknown as MarkupRule;
+    const supplierProductRule = createMarkupRuleFixture({
+      scopeType: MarkupScopeType.SUPPLIER_PRODUCT,
+      supplierId: null,
+      supplierProductId: 'sp-1',
+      markupPercentage: '30.00',
+    }) as unknown as MarkupRule;
+
+    it('should follow supplier_product > commerce_product > supplier', () => {
+      const all = [supplierRule, commerceProductRule, supplierProductRule];
+      expect(pickMarkupRule(all, target)).toBe(supplierProductRule);
+      expect(pickMarkupRule([supplierRule, commerceProductRule], target)).toBe(commerceProductRule);
+      expect(pickMarkupRule([supplierRule], target)).toBe(supplierRule);
+    });
+
+    it('should ignore commerce_product rules when the product is not linked', () => {
+      expect(
+        pickMarkupRule([supplierRule, commerceProductRule], { ...target, commerceProductId: null }),
+      ).toBe(supplierRule);
+    });
+
+    it('should return null when nothing matches', () => {
+      expect(pickMarkupRule([supplierRule], { ...target, supplierId: 'other' })).toBeNull();
+    });
+  });
+
+  describe('applyMarkup', () => {
+    const rule = (pct: string) =>
+      createMarkupRuleFixture({ markupPercentage: pct }) as unknown as MarkupRule;
+
+    it('should compute sale price rounded to cents', () => {
+      expect(applyMarkup('1000.00', rule('30.00'))).toEqual({ markupPercentage: 30, salePrice: 1300 });
+      expect(applyMarkup('99.99', rule('33.33'))).toEqual({ markupPercentage: 33.33, salePrice: 133.32 });
+    });
+
+    it('should return nulls when there is no rule or no cost', () => {
+      expect(applyMarkup('1000.00', null)).toEqual({ markupPercentage: null, salePrice: null });
+      expect(applyMarkup(null, rule('30.00'))).toEqual({ markupPercentage: 30, salePrice: null });
     });
   });
 });

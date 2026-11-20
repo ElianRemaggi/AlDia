@@ -1,6 +1,10 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { createMockRepository } from '../../test/mocks/mock-repository';
-import { createSupplierProductFixture } from '../../test/fixtures/entities';
+import {
+  createMarkupRuleFixture,
+  createSupplierProductFixture,
+} from '../../test/fixtures/entities';
+import { MarkupRule, MarkupScopeType } from '../markup/entities/markup-rule.entity';
 
 vi.mock('../../config/data-source', () => ({
   AppDataSource: { getRepository: vi.fn() },
@@ -46,6 +50,8 @@ describe('catalog.service', () => {
       ...createMockRepository(),
       createQueryBuilder: vi.fn().mockReturnValue(mockQb),
     };
+
+    mockRepo.find.mockResolvedValue([]);
 
     vi.mocked(AppDataSource.getRepository).mockReturnValue(mockRepo as never);
   });
@@ -293,6 +299,98 @@ describe('catalog.service', () => {
       await expect(toggleFavorite('bad-id', 'commerce-uuid-1', true)).rejects.toThrow(
         'Product not found',
       );
+    });
+  });
+  describe('markup in listing and detail', () => {
+    let rulesRepo: ReturnType<typeof createMockRepository>;
+    const baseQuery = { page: 1, limit: 20, sortOrder: 'ASC' as const, favoritesOnly: false };
+
+    beforeEach(() => {
+      rulesRepo = createMockRepository();
+      rulesRepo.find.mockResolvedValue([]);
+      vi.mocked(AppDataSource.getRepository).mockImplementation(
+        (entity) => (entity === MarkupRule ? rulesRepo : mockRepo) as never,
+      );
+    });
+
+    it('should add markupPercentage and salePrice from the supplier rule', async () => {
+      mockQb.getManyAndCount.mockResolvedValue([[createSupplierProductFixture({ id: 'sp-1' })], 1]);
+      mockQb.getRawMany
+        .mockResolvedValueOnce([{ supplierProductId: 'sp-1', unitCost: '1000.00' }])
+        .mockResolvedValueOnce([]);
+      rulesRepo.find.mockResolvedValue([
+        createMarkupRuleFixture({ supplierId: 'supplier-uuid-1', markupPercentage: '30.00' }),
+      ]);
+
+      const result = await listProducts('commerce-uuid-1', baseQuery);
+
+      expect(result.data[0]).toMatchObject({
+        unitCost: '1000.00',
+        markupPercentage: 30,
+        salePrice: 1300,
+      });
+    });
+
+    it('should prefer the commerce_product rule of a linked product over the supplier rule', async () => {
+      mockQb.getManyAndCount.mockResolvedValue([[createSupplierProductFixture({ id: 'sp-1' })], 1]);
+      mockQb.getRawMany
+        .mockResolvedValueOnce([{ supplierProductId: 'sp-1', unitCost: '1000.00' }])
+        .mockResolvedValueOnce([]);
+      mockRepo.find.mockResolvedValue([
+        { supplierProductId: 'sp-1', commerceProductId: 'cp-1', isFavorite: true },
+      ]);
+      rulesRepo.find.mockResolvedValue([
+        createMarkupRuleFixture({ supplierId: 'supplier-uuid-1', markupPercentage: '30.00' }),
+        createMarkupRuleFixture({
+          scopeType: MarkupScopeType.COMMERCE_PRODUCT,
+          supplierId: null,
+          commerceProductId: 'cp-1',
+          markupPercentage: '40.00',
+        }),
+      ]);
+
+      const result = await listProducts('commerce-uuid-1', baseQuery);
+
+      expect(result.data[0]).toMatchObject({ markupPercentage: 40, salePrice: 1400, isFavorite: true });
+    });
+
+    it('should return null salePrice when there is no rule or no price', async () => {
+      mockQb.getManyAndCount.mockResolvedValue([
+        [createSupplierProductFixture({ id: 'sp-1' }), createSupplierProductFixture({ id: 'sp-2' })],
+        2,
+      ]);
+      mockQb.getRawMany
+        .mockResolvedValueOnce([{ supplierProductId: 'sp-1', unitCost: '1000.00' }])
+        .mockResolvedValueOnce([]);
+      rulesRepo.find.mockResolvedValue([
+        createMarkupRuleFixture({
+          scopeType: MarkupScopeType.SUPPLIER_PRODUCT,
+          supplierId: null,
+          supplierProductId: 'sp-2',
+          markupPercentage: '50.00',
+        }),
+      ]);
+
+      const result = await listProducts('commerce-uuid-1', baseQuery);
+
+      // sp-1 has a price but no rule; sp-2 has a rule but no price
+      expect(result.data[0]).toMatchObject({ markupPercentage: null, salePrice: null });
+      expect(result.data[1]).toMatchObject({ unitCost: null, markupPercentage: 50, salePrice: null });
+    });
+
+    it('should apply markup in getProduct', async () => {
+      mockQb.getOne.mockResolvedValue(createSupplierProductFixture({ id: 'sp-1' }));
+      mockQb.getRawOne
+        .mockResolvedValueOnce({ unitCost: '150.00' })
+        .mockResolvedValueOnce(null);
+      mockRepo.findOne.mockResolvedValue(null);
+      rulesRepo.find.mockResolvedValue([
+        createMarkupRuleFixture({ supplierId: 'supplier-uuid-1', markupPercentage: '20.00' }),
+      ]);
+
+      const result = await getProduct('sp-1', 'commerce-uuid-1');
+
+      expect(result).toMatchObject({ unitCost: '150.00', markupPercentage: 20, salePrice: 180 });
     });
   });
 });

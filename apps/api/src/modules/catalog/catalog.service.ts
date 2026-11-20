@@ -1,9 +1,12 @@
+import { In } from 'typeorm';
 import { AppDataSource } from '../../config/data-source';
 import { SupplierProduct } from '../import/entities/supplier-product.entity';
 import { PriceListItem } from '../import/entities/price-list-item.entity';
 import { PriceChangeEvent } from '../import/entities/price-change-event.entity';
 import { CommerceProductSupplierLink } from '../commerce-product/entities/commerce-product-supplier-link.entity';
 import { AppError } from '../../shared/middleware';
+import { applyMarkup, listMarkupRules, pickMarkupRule } from '../markup/markup.service';
+import type { MarkupRule } from '../markup/entities/markup-rule.entity';
 import { ListProductsQuery } from './catalog.dto';
 
 const supplierProductRepo = () => AppDataSource.getRepository(SupplierProduct);
@@ -51,9 +54,11 @@ export async function listProducts(commerceId: string, query: ListProductsQuery)
   // Enrich each product with current price and latest change
   const productIds = products.map((p) => p.id);
 
-  let unitCostMap = new Map<string, string>();
-  let changeMap = new Map<string, string>();
-  let favoriteMap = new Map<string, boolean>();
+  const unitCostMap = new Map<string, string>();
+  const changeMap = new Map<string, string>();
+  const favoriteMap = new Map<string, boolean>();
+  const commerceProductMap = new Map<string, string>();
+  let rules: MarkupRule[] = [];
 
   if (productIds.length > 0) {
     // Current prices: latest price_list_item from latest processed price_list per product
@@ -91,21 +96,38 @@ export async function listProducts(commerceId: string, query: ListProductsQuery)
       }
     }
 
-    // Favorites
+    // Links: favorite flag + linked commerce product (needed for commerce_product markup rules)
     const links = await linkRepo().find({
-      where: { commerceId },
+      where: { commerceId, supplierProductId: In(productIds) },
     });
     for (const link of links) {
-      favoriteMap.set(link.supplierProductId, link.isFavorite);
+      favoriteMap.set(
+        link.supplierProductId,
+        (favoriteMap.get(link.supplierProductId) ?? false) || link.isFavorite,
+      );
+      if (link.commerceProductId) {
+        commerceProductMap.set(link.supplierProductId, link.commerceProductId);
+      }
     }
+
+    rules = await listMarkupRules(commerceId);
   }
 
-  const data = products.map((p) => ({
-    ...p,
-    unitCost: unitCostMap.get(p.id) ?? null,
-    changePercentage: changeMap.get(p.id) ?? null,
-    isFavorite: favoriteMap.get(p.id) ?? false,
-  }));
+  const data = products.map((p) => {
+    const unitCost = unitCostMap.get(p.id) ?? null;
+    const rule = pickMarkupRule(rules, {
+      supplierId: p.supplierId,
+      supplierProductId: p.id,
+      commerceProductId: commerceProductMap.get(p.id),
+    });
+    return {
+      ...p,
+      unitCost,
+      ...applyMarkup(unitCost, rule),
+      changePercentage: changeMap.get(p.id) ?? null,
+      isFavorite: favoriteMap.get(p.id) ?? false,
+    };
+  });
 
   return {
     data,
@@ -146,12 +168,20 @@ export async function getProduct(id: string, commerceId: string) {
     .orderBy('pce.createdAt', 'DESC')
     .getRawOne();
 
-  // Get favorite status
+  // Get favorite status (the link also carries the commerce product for markup precedence)
   const link = await linkRepo().findOne({ where: { supplierProductId: id, commerceId } });
+
+  const unitCost = priceRow?.unitCost ?? null;
+  const rule = pickMarkupRule(await listMarkupRules(commerceId), {
+    supplierId: product.supplierId,
+    supplierProductId: id,
+    commerceProductId: link?.commerceProductId,
+  });
 
   return {
     ...product,
-    unitCost: priceRow?.unitCost ?? null,
+    unitCost,
+    ...applyMarkup(unitCost, rule),
     changePercentage: changeRow?.changePercentage ?? null,
     isFavorite: link?.isFavorite ?? false,
   };

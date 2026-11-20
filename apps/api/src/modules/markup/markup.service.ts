@@ -67,37 +67,56 @@ export async function bulkUpdateMarkupRules(
   return markupRuleRepo().save(rules);
 }
 
+export interface MarkupTarget {
+  supplierId: string;
+  supplierProductId: string;
+  commerceProductId?: string | null;
+}
+
+/**
+ * Pick the rule that applies to a product, by precedence:
+ * supplier_product → commerce_product → supplier. Pure: callers load the
+ * commerce's rules once and reuse them for every product in a listing.
+ */
+export function pickMarkupRule(rules: MarkupRule[], target: MarkupTarget): MarkupRule | null {
+  const { supplierId, supplierProductId, commerceProductId } = target;
+  return (
+    rules.find(
+      (r) =>
+        r.scopeType === MarkupScopeType.SUPPLIER_PRODUCT &&
+        r.supplierProductId === supplierProductId,
+    ) ??
+    (commerceProductId
+      ? rules.find(
+          (r) =>
+            r.scopeType === MarkupScopeType.COMMERCE_PRODUCT &&
+            r.commerceProductId === commerceProductId,
+        )
+      : undefined) ??
+    rules.find((r) => r.scopeType === MarkupScopeType.SUPPLIER && r.supplierId === supplierId) ??
+    null
+  );
+}
+
+/** sale_price = unit_cost × (1 + markup_percentage / 100), rounded to cents. */
+export function applyMarkup(
+  unitCost: string | number | null,
+  rule: MarkupRule | null,
+): { markupPercentage: number | null; salePrice: number | null } {
+  const markupPercentage = rule ? Number(rule.markupPercentage) : null;
+  if (unitCost === null || markupPercentage === null) {
+    return { markupPercentage, salePrice: null };
+  }
+  const salePrice = Math.round(Number(unitCost) * (1 + markupPercentage / 100) * 100) / 100;
+  return { markupPercentage, salePrice };
+}
+
 export async function resolveMarkup(
   commerceId: string,
   supplierId: string,
   supplierProductId: string,
   commerceProductId?: string,
 ): Promise<MarkupRule | null> {
-  const rules = await markupRuleRepo().find({ where: { commerceId } });
-
-  // Priority 1: supplier_product rule matching supplierProductId
-  const supplierProductRule = rules.find(
-    (r) =>
-      r.scopeType === MarkupScopeType.SUPPLIER_PRODUCT &&
-      r.supplierProductId === supplierProductId,
-  );
-  if (supplierProductRule) return supplierProductRule;
-
-  // Priority 2: commerce_product rule matching commerceProductId (if provided)
-  if (commerceProductId) {
-    const commerceProductRule = rules.find(
-      (r) =>
-        r.scopeType === MarkupScopeType.COMMERCE_PRODUCT &&
-        r.commerceProductId === commerceProductId,
-    );
-    if (commerceProductRule) return commerceProductRule;
-  }
-
-  // Priority 3: supplier rule matching supplierId
-  const supplierRule = rules.find(
-    (r) => r.scopeType === MarkupScopeType.SUPPLIER && r.supplierId === supplierId,
-  );
-  if (supplierRule) return supplierRule;
-
-  return null;
+  const rules = await listMarkupRules(commerceId);
+  return pickMarkupRule(rules, { supplierId, supplierProductId, commerceProductId });
 }
