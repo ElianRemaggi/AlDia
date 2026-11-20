@@ -151,11 +151,40 @@ describe('import.service', () => {
     });
 
     it('should throw 422 for unsupported file type', async () => {
-      const pdfFile = { ...mockFile, originalname: 'invoice.pdf' } as Express.Multer.File;
+      const docxFile = { ...mockFile, originalname: 'invoice.docx' } as Express.Multer.File;
 
       await expect(
-        uploadPriceList('supplier-uuid-1', 'commerce-uuid-1', 'user-uuid-1', pdfFile, {}),
+        uploadPriceList('supplier-uuid-1', 'commerce-uuid-1', 'user-uuid-1', docxFile, {}),
       ).rejects.toThrow('Unsupported file type');
+    });
+
+    it('should resolve pdf source type and enqueue it as pdf', async () => {
+      const pdfFile = {
+        ...mockFile,
+        originalname: 'lista.pdf',
+        mimetype: 'application/pdf',
+      } as Express.Multer.File;
+
+      const priceList = createPriceListFixture({ sourceType: 'pdf' });
+      mockRepo.save
+        .mockResolvedValueOnce(priceList)
+        .mockResolvedValueOnce(priceList)
+        .mockResolvedValueOnce({ id: 'job-uuid-1' });
+
+      vi.mocked(uploadFile).mockResolvedValue('/uploads/lista.pdf');
+      vi.mocked(getFileUrl).mockResolvedValue('/uploads/lista.pdf');
+      vi.mocked(documentProcessingQueue.add).mockResolvedValue({ id: 'job-uuid-1' } as never);
+
+      await uploadPriceList('supplier-uuid-1', 'commerce-uuid-1', 'user-uuid-1', pdfFile, {});
+
+      expect(mockRepo.create).toHaveBeenCalledWith(
+        expect.objectContaining({ sourceType: 'pdf' }),
+      );
+      expect(documentProcessingQueue.add).toHaveBeenCalledWith(
+        'parse-document',
+        expect.objectContaining({ sourceType: 'pdf', fileName: 'lista.pdf' }),
+        expect.any(Object),
+      );
     });
 
     it('should resolve csv source type for .csv files', async () => {

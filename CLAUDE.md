@@ -6,7 +6,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 **PriceHub** is a SaaS platform for centralizing supplier price lists. The `mds/` directory holds all architectural and feature docs.
 
-**Current state:** Steps 1–4 complete (backend done). `apps/api` has auth, commerce, supplier, import, catalog, commerce-product, markup, purchase and notification modules, 3 migrations and 215 unit tests. `services/document-processor` has Excel/CSV parsers + BullMQ worker. **Next: Step 5 (frontend) — `apps/web` does not exist yet.** Step 6 (PDF parser) and production deploy are not started. Minor backend pending items are tracked in `mds/todo.md`.
+**Current state:** Steps 1–4 complete (backend done). `apps/api` has auth, commerce, supplier, import, catalog, commerce-product, markup, purchase and notification modules, 3 migrations and 216 unit tests. `services/document-processor` has Excel/CSV/PDF parsers + BullMQ worker (Step 6 was done early: PDF tables via pdfplumber, LLM fallback via an OpenAI-compatible API, DeepSeek by default). **Next: Step 5 (frontend) — `apps/web` does not exist yet.** Production deploy is not started. Minor backend pending items are tracked in `mds/todo.md`.
 
 **Deployment target:** Docker on a self-hosted VPS/server for the whole stack (web, api, processor, PostgreSQL, Redis). Do NOT use or add config for Railway, Vercel or Cloud Run. See `mds/deployment.md`.
 

@@ -395,7 +395,7 @@ Request: `multipart/form-data`
 
 ```json
 // Response 400 — archivo inválido
-{ "status": "error", "message": "Unsupported file type. Supported: xlsx, xls, csv" }
+{ "status": "error", "message": "Unsupported file type. Allowed: xlsx, xls, csv, pdf" }
 
 // Response 400 — archivo muy grande
 { "status": "error", "message": "File too large. Maximum size is 20MB" }
@@ -569,7 +569,7 @@ python main.py <filepath> --config config.json
 
 | Campo | Tipo | Descripción |
 |-------|------|-------------|
-| `parser` | string | `"excel"` o `"csv"` |
+| `parser` | string | `"excel"`, `"csv"`, `"pdf"` (tablas) o `"pdf_llm"` (extracción con IA) |
 | `version` | string | Versión del parser |
 | `source_file` | string | Nombre del archivo de origen |
 | `total_rows` | number | Cantidad de filas parseadas exitosamente |

@@ -60,6 +60,12 @@ GCS_BUCKET_NAME=pricehub-uploads
 GCS_PROJECT_ID=
 GCS_KEY_FILE=
 TESSERACT_CMD=/usr/bin/tesseract
+# LLM for PDFs without detectable tables (any OpenAI-compatible API; DeepSeek by default)
+LLM_API_KEY=
+LLM_BASE_URL=https://api.deepseek.com
+LLM_MODEL=deepseek-chat
+LLM_CHUNK_CHARS=6000
+LLM_MAX_WORKERS=4
 LOG_LEVEL=DEBUG
 ```
 

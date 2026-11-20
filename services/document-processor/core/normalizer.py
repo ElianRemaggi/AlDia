@@ -86,3 +86,31 @@ def _parse_decimal_point(text: str) -> float:
             text = text.replace(",", ".")
 
     return float(text)
+
+
+_COMMA_DECIMAL = re.compile(r"(\d\.\d{3},\d{1,2}$)|(\d,\d{1,2}$)")
+_POINT_DECIMAL = re.compile(r"(\d,\d{3}\.\d{1,2}$)|(\d\.\d{1,2}$)")
+
+
+def infer_price_format(values: list[object], default: str = "decimal_point") -> str:
+    """
+    Guess the price format from a sample of raw price strings.
+
+    Only unambiguous evidence counts: "1.500,50" / "850,5" vote decimal_comma,
+    "1,500.50" / "850.50" vote decimal_point. Integers like "1.500" or "1500"
+    don't vote. Returns `default` when there is no evidence or it's a tie.
+    """
+    comma = point = 0
+    for value in values:
+        if value is None or isinstance(value, (int, float)):
+            continue
+        text = re.sub(r"[$€£\s]", "", str(value))
+        if _COMMA_DECIMAL.search(text):
+            comma += 1
+        elif _POINT_DECIMAL.search(text):
+            point += 1
+    if comma > point:
+        return "decimal_comma"
+    if point > comma:
+        return "decimal_point"
+    return default

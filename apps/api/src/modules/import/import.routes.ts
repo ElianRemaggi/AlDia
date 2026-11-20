@@ -14,11 +14,11 @@ const upload = multer({
   limits: { fileSize: 20 * 1024 * 1024 }, // 20 MB
   fileFilter: (_req, file, cb) => {
     const ext = file.originalname.toLowerCase().match(/\.[^.]+$/)?.[0];
-    const allowed = ['.xlsx', '.xls', '.csv'];
+    const allowed = ['.xlsx', '.xls', '.csv', '.pdf'];
     if (ext && allowed.includes(ext)) {
       cb(null, true);
     } else {
-      cb(new Error('File type not supported. Allowed: xlsx, xls, csv'));
+      cb(new Error('File type not supported. Allowed: xlsx, xls, csv, pdf'));
     }
   },
 });

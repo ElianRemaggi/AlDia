@@ -14,7 +14,8 @@ function resolveSourceType(filename: string): PriceListSourceType {
   const ext = filename.toLowerCase().match(/\.[^.]+$/)?.[0];
   if (ext === '.xlsx' || ext === '.xls') return PriceListSourceType.EXCEL;
   if (ext === '.csv') return PriceListSourceType.CSV;
-  throw new AppError('Unsupported file type. Allowed: xlsx, xls, csv', 422);
+  if (ext === '.pdf') return PriceListSourceType.PDF;
+  throw new AppError('Unsupported file type. Allowed: xlsx, xls, csv, pdf', 422);
 }
 
 async function computeNextVersionNumber(supplierId: string, commerceId: string): Promise<number> {
@@ -85,7 +86,7 @@ export async function uploadPriceList(
     commerceId,
     fileUrl: downloadableUrl,
     fileName: file.originalname,
-    sourceType: sourceType === PriceListSourceType.EXCEL ? 'excel' : 'csv',
+    sourceType: sourceType as ParseDocumentJobData['sourceType'],
     parserConfig: {
       header_row: null,
       column_mapping: null,

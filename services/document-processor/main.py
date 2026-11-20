@@ -17,9 +17,9 @@ from pathlib import Path
 
 def main() -> None:
     parser = argparse.ArgumentParser(
-        description="Parse Excel or CSV price lists and output normalized JSON."
+        description="Parse Excel, CSV or PDF price lists and output normalized JSON."
     )
-    parser.add_argument("filepath", help="Path to the file to parse (.xlsx, .xls, .csv)")
+    parser.add_argument("filepath", help="Path to the file to parse (.xlsx, .xls, .csv, .pdf)")
     parser.add_argument(
         "--pretty",
         action="store_true",

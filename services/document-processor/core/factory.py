@@ -11,11 +11,13 @@ def select_parser(filepath: str, config: ParserConfig | None = None) -> BasePars
     # Import here to avoid circular imports at module level
     from parsers.csv_parser import CsvParser
     from parsers.excel_parser import ExcelParser
+    from parsers.pdf_parser import PdfParser
 
     extension_map: dict[str, type[BaseParser]] = {
         ".xlsx": ExcelParser,
         ".xls": ExcelParser,
         ".csv": CsvParser,
+        ".pdf": PdfParser,
     }
 
     ext = Path(filepath).suffix.lower()

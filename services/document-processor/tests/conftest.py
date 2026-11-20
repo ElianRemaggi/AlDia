@@ -74,7 +74,8 @@ def ars_price_csv():
         ["LAC-001", "Leche Entera", "1.500,50"],
         ["PAN-001", "Pan Lactal", "2.200,00"],
     ]
-    return make_csv([header] + data)
+    # Semicolon-delimited: with "," the decimal comma would split the price cell
+    return make_csv([header] + data, delimiter=";")
 
 
 @pytest.fixture

@@ -32,7 +32,7 @@ El pipeline de importación es el núcleo del producto. Toma un archivo subido p
       ▼
 [6] Python worker recibe el job
       │  Descarga archivo desde URL firmada GCS
-      │  Selecciona parser (excel/csv) por extensión
+      │  Selecciona parser (excel/csv/pdf) por extensión
       │  Parsea → ParseResult
       │  Guarda raw_output en import_parse_results
       ▼
@@ -587,8 +587,20 @@ google-cloud-storage>=2.14.0
 |------|----------|--------|
 | Excel (.xlsx, .xls) | openpyxl + pandas | ✅ Implementado (Paso 2) |
 | CSV (.csv) | pandas + chardet | ✅ Implementado (Paso 2) |
-| PDF texto | pdfplumber | Paso 6 |
-| PDF escaneado / imágenes | pytesseract | Fase 2 (post-MVP) |
+| PDF con tablas | pdfplumber (`parser: "pdf"`) | ✅ Implementado (Paso 6) |
+| PDF sin tablas | pdfplumber + LLM (`parser: "pdf_llm"`) | ✅ Implementado (Paso 6) |
+| PDF escaneado | pdf2image + pytesseract → LLM | ⚠️ Best-effort: solo si el container tiene `tesseract-ocr`, `tesseract-ocr-spa` y `poppler-utils` |
+| Imágenes | — | Fase 2 (post-MVP) |
+
+### PdfParser (`parsers/pdf_parser.py`)
+
+1. **Tablas (determinista, sin costo):** `pdfplumber.extract_tables()` + la misma detección de header/columnas que Excel. Se descartan headers repetidos por página. El formato de precio (`1.500,50` vs `1,500.50`) se infiere de los valores (`infer_price_format`).
+2. **Fallback LLM** (`core/llm_extractor.py`): si no hay tabla con columnas de nombre y precio, o la tabla es mayormente ruido. El texto se parte por líneas (nunca corta una fila), los chunks posteriores reciben las primeras líneas del documento como contexto de columnas, y se procesan en paralelo (`LLM_MAX_WORKERS`). Cualquier API compatible con OpenAI (DeepSeek por defecto, ver `env-vars.md`).
+3. **Salvaguardas sobre la respuesta del LLM:**
+   - El LLM devuelve `price_text` copiado textualmente; si no aparece en el texto fuente la fila se rechaza (`price not found in source text`). El precio lo normaliza `normalize_price`, nunca el LLM.
+   - Códigos que no aparecen en el texto se descartan (`supplier_product_code = null`) para no romper el matching del próximo import. Nunca se generan códigos.
+   - Respuestas truncadas, JSON inválido o errores de API se registran en `errors` por chunk → el import queda `partial`.
+4. Sin `LLM_API_KEY`, un PDF sin tablas falla con un mensaje claro (los PDFs con tablas funcionan igual).
 
 ---
 

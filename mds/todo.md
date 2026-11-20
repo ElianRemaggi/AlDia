@@ -14,7 +14,7 @@
 | 3. Import Pipeline (API + BullMQ + Python) | ✅ |
 | 4. Remaining API (catálogo, markup, compras, notificaciones) | ✅ (con pendientes menores) |
 | 5. Frontend (`apps/web`) | ❌ No iniciado |
-| 6. PDF parser | ❌ No iniciado |
+| 6. PDF parser | ✅ (adelantado; tablas + fallback LLM) |
 | Deploy (Docker en VPS / servidor propio) | ❌ No iniciado |
 
 ---
@@ -92,9 +92,12 @@
 - [x] Error handling for malformed files
 
 ### 2.6 Parsers — PDF (Paso 6)
-- [ ] Python: PDF text extraction (pdfplumber)
-- [ ] Table detection and row extraction
-- [ ] Handle multi-page PDFs
+- [x] Python: PDF text + table extraction (pdfplumber), multi-página — `parsers/pdf_parser.py`
+- [x] Fallback LLM para PDFs sin tablas (DeepSeek u otra API compatible con OpenAI) — `core/llm_extractor.py`
+- [x] Salvaguardas: precios verificados contra el texto, códigos no inventados, chunks fallidos en `errors`
+- [x] API acepta `.pdf` en upload
+- [ ] Probar con listas PDF reales de proveedores y ajustar prompt / detección
+- [ ] OCR para PDFs escaneados: instalar `tesseract-ocr`, `tesseract-ocr-spa`, `poppler-utils` en el Dockerfile del processor
 
 ### 2.7 Import Pipeline — Processing (Paso 3) ✅
 - [x] Segunda migración: price_lists, price_list_items, import_jobs, price_change_events, import_parse_results
