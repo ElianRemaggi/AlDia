@@ -1,0 +1,17 @@
+# Optional: expose the production stack through a Cloudflare Tunnel instead of public ports.
+#   docker compose -f docker-compose.prod.yml -f docker-compose.tunnel.yml --env-file .env.prod up -d
+# Cloudflare terminates TLS, so in .env.prod: DOMAIN=:80 (Caddy serves plain HTTP inside),
+# COOKIE_SECURE=true (the browser still sees https), HTTP_PORT/HTTPS_PORT bound to 127.0.0.1.
+# TUNNEL_TOKEN: `cloudflared tunnel token <name>` (the tunnel's DNS route points at it).
+services:
+  tunnel:
+    image: cloudflare/cloudflared:latest
+    restart: unless-stopped
+    command: ["tunnel", "--no-autoupdate", "run", "--url", "http://proxy:80"]
+    environment:
+      TUNNEL_TOKEN: ${TUNNEL_TOKEN:?set TUNNEL_TOKEN (cloudflared tunnel token <name>)}
+    logging:
+      driver: json-file
+      options: { max-size: "10m", max-file: "5" }
+    depends_on:
+      proxy: { condition: service_started }

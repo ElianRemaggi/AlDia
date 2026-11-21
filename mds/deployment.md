@@ -70,6 +70,23 @@ Después, desde `/admin`: crear el comercio y su usuario. **No** correr `pnpm se
 
 Para no tipear el comando entero: `alias dc='docker compose -f docker-compose.prod.yml --env-file .env.prod'`.
 
+### Con Cloudflare Tunnel (sin abrir puertos) — instancia actual: `aldia.drintlab.com`
+
+Cloudflare termina el TLS y el conector `cloudflared` corre como un servicio más del stack (`docker-compose.tunnel.yml`), apuntando a `http://proxy:80`. No hace falta abrir 80/443 ni IP pública.
+
+```bash
+cloudflared tunnel create aldia
+cloudflared tunnel route dns aldia aldia.drintlab.com
+cloudflared tunnel token aldia          # → TUNNEL_TOKEN en .env.prod
+```
+
+En `.env.prod`: `DOMAIN=:80`, `COOKIE_SECURE=true` (el browser ve https), `HTTP_PORT=127.0.0.1:8088`, `HTTPS_PORT=127.0.0.1:8443` (solo localhost) y `TUNNEL_TOKEN=...`. Todos los comandos `dc` llevan los dos archivos:
+
+```bash
+alias dc='docker compose -f docker-compose.prod.yml -f docker-compose.tunnel.yml --env-file .env.prod'
+dc up -d --build
+```
+
 ### Sin dominio (prueba en LAN)
 
 `DOMAIN=:80` y `COOKIE_SECURE=false` en `.env.prod`: Caddy sirve HTTP plano y la cookie de refresh se manda sin `Secure` (si no, el browser no la guarda y la sesión se pierde al recargar). No usar así en Internet.

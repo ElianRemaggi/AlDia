@@ -47,3 +47,6 @@ uploads/
 # Production secrets and backups (see docker-compose.prod.yml)
 .env.prod
 deploy/backups/
+
+# Local test credentials (never commit)
+credenciales-pruebas.md
