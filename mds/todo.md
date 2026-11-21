@@ -13,7 +13,7 @@
 | 2. Document Processor (Excel/CSV) | ✅ |
 | 3. Import Pipeline (API + BullMQ + Python) | ✅ |
 | 4. Remaining API (catálogo, markup, compras, notificaciones) | ✅ (con pendientes menores) |
-| 5. Frontend (`apps/web`) | 🟡 F1–F4 ✅ (auth, proveedores, admin, subida de listas, catálogo, compras, notificaciones). Sigue F5 (dashboard + polish) |
+| 5. Frontend (`apps/web`) | ✅ F1–F5 (auth, proveedores, admin, subida de listas, catálogo, compras, notificaciones, dashboards, polish) |
 | 6. PDF parser | ✅ (adelantado; tablas + fallback LLM) |
 | Deploy (Docker en VPS / servidor propio) | ❌ No iniciado |
 
@@ -212,12 +212,12 @@
 - [x] `/notifications` — centro de notificaciones
 
 ### F5 — Dashboard + Polish
-- [ ] `/` — dashboard con stats reales
-- [ ] `/admin` — dashboard admin
-- [ ] Empty states en todas las páginas
-- [ ] Loading skeletons
-- [ ] Error boundaries
-- [ ] Responsive: tablas → cards en mobile
+- [x] `/` — dashboard con stats reales (`GET /dashboard/summary`)
+- [x] `/admin` — dashboard admin (`GET /admin/dashboard/summary`)
+- [x] Empty states en todas las páginas
+- [x] Loading skeletons
+- [x] Error boundaries (+ 404 y global-error)
+- [x] Responsive: barra de pestañas inferior en mobile, columnas secundarias ocultas
 
 ---
 

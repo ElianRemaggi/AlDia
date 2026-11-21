@@ -516,6 +516,51 @@ Tipos (`type`): `import_finished`, `import_failed`, `price_change` (resumen de l
 
 ---
 
+## Dashboard
+
+| Método | Ruta | Rol | Descripción |
+|--------|------|-----|-------------|
+| GET | `/dashboard/summary` | commerce | Resumen del inicio del comercio |
+| GET | `/admin/dashboard/summary` | admin | Resumen de la plataforma |
+
+### GET `/dashboard/summary`
+
+```json
+{
+  "status": "success",
+  "data": {
+    "windows": { "recentImportDays": 7, "recentChangeDays": 30 },
+    "stats": {
+      "activeSuppliers": 3, "totalProducts": 120,
+      "recentImports": 2, "pendingImports": 1,
+      "recentPriceChanges": 15, "activePurchaseLists": 1
+    },
+    "recentChanges": [
+      { "id": "uuid", "supplierProductId": "uuid", "productName": "Aceite Girasol 1.5L",
+        "supplierId": "uuid", "supplierName": "Distribuidora Central",
+        "oldPrice": 3000, "newPrice": 3600, "changePercentage": 20, "createdAt": "..." }
+    ],
+    "recentImports": [
+      { "id": "uuid", "supplierId": "uuid", "supplierName": "Lacteos Premium", "sourceFileName": "lista.xlsx",
+        "status": "failed", "versionNumber": 2, "itemCount": 0,
+        "errorMessage": "File is not a zip file", "uploadedAt": "...", "processedAt": null }
+    ],
+    "favoriteAlerts": [ /* mismo formato que recentChanges */ ]
+  }
+}
+```
+
+- `recentChanges`: el último cambio de cada producto en los últimos 30 días, top 10 por `abs(changePercentage)`.
+- `favoriteAlerts`: lo mismo, solo favoritos, del más reciente al más viejo (máx. 10).
+- `recentImports`: las últimas 5 listas subidas; `errorMessage` solo si `status = failed`.
+- `recentImports` (stat) cuenta listas subidas en los últimos 7 días; `pendingImports` las `pending`/`processing`.
+
+### GET `/admin/dashboard/summary`
+
+`stats` (`commerces {total, active}`, `users {total, active}`, `totalProducts`, `imports {total, processed, failed, pending}` de los últimos 7 días), `recentFailedImports` (últimas 5 fallidas de todos los comercios, con comercio, proveedor, archivo y error) y `commerces` (actividad por comercio: proveedores, productos, listas en 7 días, `lastImportAt`; máx. 50).
+
+---
+
 ## Health Check
 
 ### GET `/health`

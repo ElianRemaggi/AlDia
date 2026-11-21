@@ -36,6 +36,11 @@ export const queryKeys = {
     list: (params: object) => ["notifications", "list", params] as const,
     unreadCount: ["notifications", "unread-count"] as const,
   },
+  dashboard: {
+    all: ["dashboard"] as const,
+    summary: ["dashboard", "summary"] as const,
+    admin: ["dashboard", "admin"] as const,
+  },
   importJobs: {
     detail: (id: string) => ["import-jobs", id] as const,
   },

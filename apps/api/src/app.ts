@@ -15,6 +15,7 @@ import markupRoutes from './modules/markup/markup.routes';
 import purchaseRoutes from './modules/purchase/purchase.routes';
 import notificationRoutes from './modules/notification/notification.routes';
 import adminUserRoutes from './modules/user/user.routes';
+import { dashboardRouter, adminDashboardRouter } from './modules/dashboard/dashboard.routes';
 
 const app = express();
 
@@ -41,6 +42,8 @@ app.use('/api/v1/markup-rules', markupRoutes);
 app.use('/api/v1/purchase-lists', purchaseRoutes);
 app.use('/api/v1/notifications', notificationRoutes);
 app.use('/api/v1/admin/users', adminUserRoutes);
+app.use('/api/v1/dashboard', dashboardRouter);
+app.use('/api/v1/admin/dashboard', adminDashboardRouter);
 
 // Error handling
 app.use(errorHandler);

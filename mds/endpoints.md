@@ -210,9 +210,8 @@ All commerce routes are scoped to the authenticated user's `commerce_id`.
 
 | Method | Path | Description |
 |--------|------|-------------|
-| GET | `/dashboard/summary` | Overview: recent imports, active suppliers, product count |
-| GET | `/dashboard/recent-changes` | Top price changes (last 7 days) |
-| GET | `/dashboard/import-activity` | Import history chart data |
+| GET | `/dashboard/summary` | Stats, top price changes (30 days), last imports, favorite alerts — one call |
+| GET | `/admin/dashboard/summary` | Admin: platform stats, recent failed imports, activity per commerce |
 
 ---
 

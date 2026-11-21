@@ -190,7 +190,14 @@ export function ProductsTable({ supplierId: fixedSupplierId, pageSize = 20 }: { 
                   {showSupplier && <TableHead className="hidden lg:table-cell">Proveedor</TableHead>}
                   <SortableHead label="Costo" by="price" sort={sort} onSort={toggleSort} align="right" />
                   <TableHead className="hidden text-right sm:table-cell">Precio de venta</TableHead>
-                  <SortableHead label="Último cambio" by="change" sort={sort} onSort={toggleSort} align="right" />
+                  <SortableHead
+                    label="Último cambio"
+                    by="change"
+                    sort={sort}
+                    onSort={toggleSort}
+                    align="right"
+                    className="hidden sm:table-cell"
+                  />
                   <TableHead className="w-10">
                     <span className="sr-only">Agregar a lista</span>
                   </TableHead>
@@ -209,7 +216,7 @@ export function ProductsTable({ supplierId: fixedSupplierId, pageSize = 20 }: { 
                       <TableCell>
                         <FavoriteButton productId={product.id} productName={product.name} isFavorite={product.isFavorite} />
                       </TableCell>
-                      <TableCell className="max-w-80">
+                      <TableCell className="min-w-36 max-w-80 whitespace-normal">
                         <Link
                           href={`/products/${product.id}`}
                           className="font-medium hover:underline"
@@ -224,7 +231,15 @@ export function ProductsTable({ supplierId: fixedSupplierId, pageSize = 20 }: { 
                       {showSupplier && (
                         <TableCell className="hidden text-muted-foreground lg:table-cell">{product.supplier.name}</TableCell>
                       )}
-                      <TableCell className="text-right tabular-nums">{formatMoney(product.unitCost)}</TableCell>
+                      <TableCell className="text-right tabular-nums">
+                        {formatMoney(product.unitCost)}
+                        {/* On phones the change column is hidden: show it under the cost */}
+                        {product.changePercentage !== null && (
+                          <div className="text-xs sm:hidden">
+                            <PriceChange percentage={product.changePercentage} />
+                          </div>
+                        )}
+                      </TableCell>
                       <TableCell className="hidden text-right tabular-nums sm:table-cell">
                         {product.salePrice !== null ? (
                           <>
@@ -237,7 +252,7 @@ export function ProductsTable({ supplierId: fixedSupplierId, pageSize = 20 }: { 
                           </span>
                         )}
                       </TableCell>
-                      <TableCell className="text-right">
+                      <TableCell className="hidden text-right sm:table-cell">
                         <PriceChange percentage={product.changePercentage} previousPrice={product.previousPrice} />
                       </TableCell>
                       <TableCell>
@@ -262,19 +277,21 @@ function SortableHead({
   sort,
   onSort,
   align = "left",
+  className,
 }: {
   label: string;
   by: SortBy;
   sort: { by: SortBy; order: SortOrder };
   onSort: (by: SortBy) => void;
   align?: "left" | "right";
+  className?: string;
 }) {
   const active = sort.by === by;
   const Icon = !active ? ArrowUpDownIcon : sort.order === "ASC" ? ArrowUpIcon : ArrowDownIcon;
   return (
     <TableHead
       aria-sort={active ? (sort.order === "ASC" ? "ascending" : "descending") : "none"}
-      className={cn(align === "right" && "text-right")}
+      className={cn(align === "right" && "text-right", className)}
     >
       <button
         type="button"

@@ -192,3 +192,74 @@ export interface AppNotification {
   } | null;
   createdAt: string;
 }
+
+// ── Dashboard ────────────────────────────────────────────────────────────────
+
+export interface DashboardChange {
+  id: string;
+  supplierProductId: string;
+  productName: string;
+  supplierId: string;
+  supplierName: string;
+  oldPrice: number;
+  newPrice: number;
+  changePercentage: number;
+  createdAt: string;
+}
+
+export interface DashboardImport {
+  id: string;
+  supplierId: string;
+  supplierName: string;
+  sourceFileName: string | null;
+  status: PriceListStatus;
+  versionNumber: number;
+  itemCount: number;
+  errorMessage: string | null;
+  uploadedAt: string;
+  processedAt: string | null;
+}
+
+export interface DashboardSummary {
+  windows: { recentImportDays: number; recentChangeDays: number };
+  stats: {
+    activeSuppliers: number;
+    totalProducts: number;
+    recentImports: number;
+    pendingImports: number;
+    recentPriceChanges: number;
+    activePurchaseLists: number;
+  };
+  recentChanges: DashboardChange[];
+  recentImports: DashboardImport[];
+  favoriteAlerts: DashboardChange[];
+}
+
+export interface AdminDashboardSummary {
+  windows: { recentImportDays: number };
+  stats: {
+    commerces: { total: number; active: number };
+    users: { total: number; active: number };
+    totalProducts: number;
+    imports: { total: number; processed: number; failed: number; pending: number };
+  };
+  recentFailedImports: {
+    id: string;
+    commerceId: string;
+    commerceName: string;
+    supplierId: string;
+    supplierName: string;
+    sourceFileName: string | null;
+    errorMessage: string | null;
+    uploadedAt: string;
+  }[];
+  commerces: {
+    id: string;
+    name: string;
+    isActive: boolean;
+    supplierCount: number;
+    productCount: number;
+    recentImports: number;
+    lastImportAt: string | null;
+  }[];
+}

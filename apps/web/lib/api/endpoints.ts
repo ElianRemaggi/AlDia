@@ -1,5 +1,7 @@
 import { api } from "./client";
 import type {
+  AdminDashboardSummary,
+  DashboardSummary,
   AppNotification,
   Commerce,
   ImportJob,
@@ -185,4 +187,11 @@ export const notificationsApi = {
   unreadCount: () => unwrap(api<Data<{ count: number }>>("/notifications/unread-count")),
   markRead: (id: string) => api(`/notifications/${id}/read`, { method: "PATCH" }),
   markAllRead: () => api("/notifications/mark-all-read", { method: "POST" }),
+};
+
+// ── Dashboard ────────────────────────────────────────────────────────────────
+
+export const dashboardApi = {
+  summary: () => unwrap(api<Data<DashboardSummary>>("/dashboard/summary")),
+  adminSummary: () => unwrap(api<Data<AdminDashboardSummary>>("/admin/dashboard/summary")),
 };

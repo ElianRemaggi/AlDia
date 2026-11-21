@@ -14,7 +14,6 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import { NotificationBell } from "@/components/notifications/notification-bell";
-import { ButtonLink } from "@/components/shared/button-link";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -31,6 +30,8 @@ import { cn } from "@/lib/utils";
 interface NavItem {
   href: string;
   label: string;
+  /** Bottom tab bar label, when the full one doesn't fit on a phone. */
+  shortLabel?: string;
   icon: LucideIcon;
   exact?: boolean;
 }
@@ -39,7 +40,7 @@ const NAV: Record<"commerce" | "admin", NavItem[]> = {
   commerce: [
     { href: "/", label: "Inicio", icon: HomeIcon, exact: true },
     { href: "/products", label: "Productos", icon: PackageIcon },
-    { href: "/purchase-lists", label: "Listas de compra", icon: ClipboardListIcon },
+    { href: "/purchase-lists", label: "Listas de compra", shortLabel: "Listas", icon: ClipboardListIcon },
     { href: "/suppliers", label: "Proveedores", icon: TruckIcon },
   ],
   admin: [
@@ -76,36 +77,73 @@ export function AppShell({
 
       <div className="flex min-w-0 flex-1 flex-col">
         <header className="flex h-14 items-center justify-between gap-4 border-b px-4 md:px-6">
-          <nav className="flex gap-1 overflow-x-auto md:hidden" aria-label="Navegación">
-            {items.map((item) => (
-              <ButtonLink key={item.href} href={item.href} variant="ghost" size="sm">
-                <item.icon />
-                {item.label}
-              </ButtonLink>
-            ))}
-          </nav>
-          <div className="ml-auto flex items-center gap-1">
+          <Link href={variant === "admin" ? "/admin" : "/"} className="font-semibold md:hidden">
+            PriceHub
+          </Link>
+          <div className="ml-auto flex min-w-0 items-center gap-1">
             {variant === "commerce" && <NotificationBell />}
             <UserMenu />
           </div>
         </header>
-        <main className="flex-1 p-4 md:p-6">{children}</main>
+        {/* pb clears the fixed bottom tab bar on mobile */}
+        <main className="flex-1 p-4 pb-24 md:p-6">{children}</main>
       </div>
+
+      <Suspense fallback={<TabBar items={items} pathname={null} />}>
+        <ActiveTabBar items={items} />
+      </Suspense>
     </div>
   );
 }
 
+const isActive = (item: NavItem, pathname: string | null) =>
+  pathname !== null && (item.exact ? pathname === item.href : pathname.startsWith(item.href));
+
 function ActiveNav({ items }: { items: NavItem[] }) {
   return <NavLinks items={items} pathname={usePathname()} />;
+}
+
+function ActiveTabBar({ items }: { items: NavItem[] }) {
+  return <TabBar items={items} pathname={usePathname()} />;
+}
+
+/** Mobile navigation: fixed bottom tabs, thumb-reachable, every section always visible. */
+function TabBar({ items, pathname }: { items: NavItem[]; pathname: string | null }) {
+  return (
+    <nav
+      aria-label="Navegación"
+      className="fixed inset-x-0 bottom-0 z-40 border-t bg-background/95 pb-[env(safe-area-inset-bottom)] backdrop-blur md:hidden"
+    >
+      <ul className="grid" style={{ gridTemplateColumns: `repeat(${items.length}, minmax(0, 1fr))` }}>
+        {items.map((item) => {
+          const active = isActive(item, pathname);
+          return (
+            <li key={item.href}>
+              <Link
+                href={item.href}
+                aria-current={active ? "page" : undefined}
+                aria-label={item.label}
+                className={cn(
+                  "flex h-14 flex-col items-center justify-center gap-0.5 px-1 text-[11px] leading-tight text-muted-foreground outline-none focus-visible:bg-muted",
+                  active && "font-medium text-foreground",
+                )}
+              >
+                <item.icon className="size-5" aria-hidden />
+                <span className="max-w-full truncate">{item.shortLabel ?? item.label}</span>
+              </Link>
+            </li>
+          );
+        })}
+      </ul>
+    </nav>
+  );
 }
 
 function NavLinks({ items, pathname }: { items: NavItem[]; pathname: string | null }) {
   return (
     <nav className="flex flex-col gap-1 p-3" aria-label="Navegación principal">
       {items.map((item) => {
-        const active =
-          pathname !== null &&
-          (item.exact ? pathname === item.href : pathname.startsWith(item.href));
+        const active = isActive(item, pathname);
         return (
           <Link
             key={item.href}
@@ -133,7 +171,7 @@ function UserMenu() {
   return (
     <DropdownMenu>
       <DropdownMenuTrigger render={<Button variant="ghost" size="sm" />}>
-        {user.name}
+        <span className="max-w-36 truncate">{user.name}</span>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="w-56">
         <DropdownMenuGroup>

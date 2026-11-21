@@ -431,14 +431,13 @@ Las páginas se construyen **en orden de disponibilidad de la API**:
 - [x] `/notifications` — centro con filtro "solo sin leer" y "marcar todas como leídas"
 - Copiar: `lib/clipboard.ts` (fallback con `execCommand` fuera de contextos seguros, p. ej. http en LAN).
 
-### Fase F5 — Paso 6 Dashboard + Polish
-- [ ] `/` dashboard con stats reales
-- [ ] `/admin` dashboard admin
-- [ ] Empty states en todas las páginas vacías
-- [ ] Loading skeletons
-- [ ] Error boundaries
-- [ ] Responsive: tablas → cards en mobile
-- [ ] Toast system global (shadcn Toaster)
+### Fase F5 — ✅ Implementada (2026-11-21)
+- [x] `/` dashboard: tiles (proveedores, productos, cambios 30 días, listas importadas 7 días), mayores cambios de precio, favoritos que cambiaron, últimas importaciones (con error si fallaron); onboarding si no hay proveedores. Se refresca al montar y hace polling cada 5s mientras hay importaciones en proceso
+- [x] `/admin` dashboard: comercios/usuarios activos, productos, importaciones 7 días, fallidas recientes, actividad por comercio
+- [x] Empty states y loading skeletons en todas las páginas (ya venían de F1–F4)
+- [x] Error boundaries: `(dashboard)/error.tsx` y `admin/error.tsx` (el layout queda montado; `retry`), `global-error.tsx`, `not-found.tsx`
+- [x] Responsive: en mobile la navegación es una barra de pestañas inferior; las tablas ocultan columnas secundarias (en productos el cambio va debajo del costo). Sin scroll horizontal en las páginas principales a 375px
+- [x] Toasts globales (sonner, desde F1)
 
 ---
 
