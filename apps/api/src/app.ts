@@ -3,6 +3,7 @@ import cors from 'cors';
 import helmet from 'helmet';
 import cookieParser from 'cookie-parser';
 import { config } from './config';
+import { AppDataSource } from './config/data-source';
 import { errorHandler } from './shared/middleware';
 
 import authRoutes from './modules/auth/auth.routes';
@@ -19,15 +20,28 @@ import { dashboardRouter, adminDashboardRouter } from './modules/dashboard/dashb
 
 const app = express();
 
+// In production the API sits behind one reverse proxy (Caddy): trust its X-Forwarded-* headers.
+app.set('trust proxy', 1);
+
 // Global middleware
 app.use(helmet());
 app.use(cors({ origin: config.cors.origin, credentials: true }));
 app.use(express.json({ limit: '20mb' }));
 app.use(cookieParser());
 
-// Health check
-app.get('/api/v1/health', (_req, res) => {
-  res.json({ status: 'ok', timestamp: new Date().toISOString() });
+// Health check: used by the container healthcheck, so it must reflect the DB connection.
+app.get('/api/v1/health', async (_req, res) => {
+  let database: 'ok' | 'down' = 'ok';
+  try {
+    await AppDataSource.query('SELECT 1');
+  } catch {
+    database = 'down';
+  }
+  res.status(database === 'ok' ? 200 : 503).json({
+    status: database === 'ok' ? 'ok' : 'error',
+    database,
+    timestamp: new Date().toISOString(),
+  });
 });
 
 // Routes

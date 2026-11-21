@@ -33,6 +33,12 @@ export const config = {
     origin: process.env.CORS_ORIGIN || 'http://localhost:3000',
   },
 
+  // Refresh cookie `Secure` flag. On by default in production (HTTPS behind the proxy);
+  // COOKIE_SECURE=false only for a plain-HTTP deployment (e.g. a LAN test box).
+  cookieSecure: process.env.COOKIE_SECURE
+    ? process.env.COOKIE_SECURE === 'true'
+    : process.env.NODE_ENV === 'production',
+
   logLevel: process.env.LOG_LEVEL || 'debug',
 
   gcs: {

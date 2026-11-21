@@ -1,153 +1,136 @@
-# Deployment Plan
+# Deployment
 
 > **Decisión (2026-11-20):** todo PriceHub (frontend, API, document processor, PostgreSQL y Redis) se despliega con **Docker en un VPS o servidor propio**. No se usa Railway, Vercel ni Cloud Run.
+>
+> **Estado (2026-11-21):** imágenes, `docker-compose.prod.yml`, proxy con HTTPS, migraciones automáticas, alta de admin y backups implementados y probados en un stack local (HTTP). Falta: el servidor real, CI/CD, monitoreo.
 
-## Architecture
+## Arquitectura
 
 ```
                     Internet (HTTPS :443)
                             │
-┌───────────────────────────┼───────────────────────────────┐
-│  VPS / servidor propio    ▼          (docker compose)      │
-│                   ┌───────────────┐                         │
-│                   │ Reverse proxy │  Caddy o Nginx          │
-│                   │ + TLS (LE)    │                         │
-│                   └───┬───────┬───┘                         │
-│          pricehub.app │       │ api.pricehub.app            │
-│                       ▼       ▼                             │
-│  ┌──────────────┐  ┌──────────────┐  ┌──────────────────┐   │
-│  │   Next.js    │  │ Express API  │  │ Python Processor │   │
-│  │   (web)      │  │   :4000      │  │    (worker)      │   │
-│  │   :3000      │  │ + BullMQ     │  │                  │   │
-│  └──────────────┘  └──────┬───────┘  └────────┬─────────┘   │
-│                           │                   │             │
-│                    ┌──────┴───────────────────┴──┐          │
-│                    │   Redis :6379 (BullMQ)       │          │
-│                    └──────────────────────────────┘          │
-│                    ┌──────────────────────────────┐          │
-│                    │   PostgreSQL :5432 (volumen)  │          │
-│                    └──────────────────────────────┘          │
-└───────────────────────────────────────────────────────────┘
-              Archivos subidos: GCS (o volumen local)
+┌───────────────────────────┼──────────────────────────────┐
+│  Servidor  (docker compose -f docker-compose.prod.yml)    │
+│                   ┌───────▼───────┐                       │
+│                   │     Caddy     │  TLS automático (LE)  │
+│                   └───┬───────┬───┘                       │
+│          /api/*       │       │  todo lo demás            │
+│                       ▼       ▼                           │
+│  ┌──────────────┐  ┌──────────────┐  ┌──────────────────┐ │
+│  │ Express API  │  │   Next.js    │  │ Python processor │ │
+│  │    :4000     │  │ (standalone) │  │  (BullMQ worker) │ │
+│  └──┬────────┬──┘  │    :3000     │  └───┬─────────┬────┘ │
+│     │        │     └──────────────┘      │         │      │
+│     │   ┌────▼─────────────────────────────▼┐      │      │
+│     │   │ Redis 7 (AOF) — cola BullMQ       │      │      │
+│     │   └───────────────────────────────────┘      │      │
+│  ┌──▼──────────────┐   ┌─────────────────────────────▼──┐ │
+│  │ PostgreSQL 15   │   │ volumen `uploads` (rw API,     │ │
+│  │ volumen pgdata  │   │ ro processor) — o GCS          │ │
+│  └─────────────────┘   └────────────────────────────────┘ │
+└──────────────────────────────────────────────────────────┘
 ```
 
-Solo el reverse proxy expone puertos al exterior (80/443). PostgreSQL, Redis, API, web y processor quedan en la red interna de Docker.
+- Solo Caddy publica puertos (80/443). El resto queda en la red interna de Docker.
+- El browser llama siempre a `/api/v1` en el **mismo origen**: Caddy manda `/api/*` a la API y el resto a Next. La cookie de refresh (`sameSite: strict`, `path: /api/v1/auth/refresh`) depende de esto; no hay CORS.
+- Archivos subidos: si `GCS_BUCKET_NAME` está vacío, la API los guarda en el volumen `uploads` (`/data/uploads`) y le pasa la ruta absoluta al processor, que monta el mismo volumen en solo lectura.
 
-**Routing del proxy:** `pricehub.app/api/*` → `api:4000` y el resto → `web:3000`. El frontend llama siempre a `/api/v1` en su mismo origen: la cookie de refresh (`sameSite: strict`, `path: /api/v1/auth/refresh`) solo funciona así, sin CORS. Un subdominio `api.pricehub.app` es opcional (para integraciones), no lo usa el browser.
+## Archivos
 
-## Local Development
+| Archivo | Qué es |
+|---|---|
+| `apps/api/Dockerfile` | Multi-stage pnpm: `tsc` + `pnpm deploy --prod`. Al arrancar corre `dist/shared/database/migrate.js` y después `dist/server.js`. Usuario `node`. Healthcheck `GET /api/v1/health` (503 si la DB no responde) |
+| `apps/web/Dockerfile` | Next `output: "standalone"`; server en `apps/web/server.js`, con `.next/static` y `public/` copiados al lado |
+| `services/document-processor/Dockerfile` | Python 3.12 + poppler + tesseract (spa) para el OCR de PDFs escaneados. Corre `python -m worker.bullmq_worker` |
+| `docker-compose.prod.yml` | proxy, web, api, processor, postgres, redis. `restart: unless-stopped`, healthchecks, rotación de logs (10MB × 5) |
+| `deploy/Caddyfile` | Routing `/api/*` → api, resto → web; body máx. 25MB (la API corta en 20MB con 413) |
+| `deploy/prod.env.example` | Plantilla de `.env.prod` |
+| `deploy/backup.sh` | `pg_dump` + tar del volumen de uploads, con retención |
+| `.dockerignore` | Contexto de build de api/web (raíz del repo) |
 
-`docker-compose.yml` levanta solo la infraestructura (PostgreSQL 15 + Redis 7):
+## Primer deploy
+
+Requisitos en el servidor: Docker Engine + plugin compose, puertos 80 y 443 abiertos, y un registro DNS A/AAAA del dominio apuntando al servidor (Caddy saca el certificado solo).
 
 ```bash
-docker-compose up -d                       # postgres + redis
-pnpm --filter api dev                      # API con hot reload (:4000)
-pnpm --filter web dev                      # Frontend (:3000) — cuando exista apps/web
-cd services/document-processor && python main.py   # worker Python
+git clone <repo> /srv/pricehub && cd /srv/pricehub
+cp deploy/prod.env.example .env.prod
+# Completar: DOMAIN, POSTGRES_PASSWORD y JWT_SECRET (openssl rand -hex 32), LLM_API_KEY (opcional)
+chmod 600 .env.prod
+
+docker compose -f docker-compose.prod.yml --env-file .env.prod up -d --build
+docker compose -f docker-compose.prod.yml --env-file .env.prod ps     # todo "healthy"
+
+# Admin inicial (idempotente: si ya existe, le resetea la contraseña). Mínimo 10 caracteres.
+docker compose -f docker-compose.prod.yml --env-file .env.prod run --rm \
+  -e ADMIN_EMAIL=vos@tudominio.com -e ADMIN_PASSWORD='...' api node dist/shared/database/create-admin.js
 ```
 
-## Environments
+Después, desde `/admin`: crear el comercio y su usuario. **No** correr `pnpm seed` en producción (crea usuarios demo con contraseñas conocidas).
 
-| Environment | Frontend | Backend | Database |
-|-------------|----------|---------|----------|
-| Local | localhost:3000 | localhost:4000 | localhost:5432 (docker) |
-| Staging | staging.pricehub.app | api-staging.pricehub.app | PostgreSQL en container (servidor propio) |
-| Production | pricehub.app | api.pricehub.app | PostgreSQL en container (servidor propio) |
+Para no tipear el comando entero: `alias dc='docker compose -f docker-compose.prod.yml --env-file .env.prod'`.
 
-Variables de entorno: ver `env-vars.md`. En el servidor se cargan desde un `.env` fuera del repo (nunca commiteado).
+### Sin dominio (prueba en LAN)
 
-## Producción: `docker-compose.prod.yml` (a crear)
+`DOMAIN=:80` y `COOKIE_SECURE=false` en `.env.prod`: Caddy sirve HTTP plano y la cookie de refresh se manda sin `Secure` (si no, el browser no la guarda y la sesión se pierde al recargar). No usar así en Internet.
 
-Servicios:
-- `proxy` — Caddy (TLS automático) o Nginx + certbot. Único servicio con puertos publicados.
-- `web` — imagen de `apps/web` (Next.js `output: "standalone"`).
-- `api` — imagen de `apps/api`. Corre migraciones antes de arrancar.
-- `processor` — imagen de `services/document-processor`.
-- `postgres` — `postgres:15`, volumen persistente.
-- `redis` — `redis:7-alpine`, con AOF habilitado para no perder jobs.
+Si 80/443 ya están ocupados en el host, cambiar `HTTP_PORT` / `HTTPS_PORT` (con dominio real Let's Encrypt necesita 80 y 443 públicos).
 
-Todos con `restart: unless-stopped` y healthchecks.
+## Actualizar
 
-### Dockerfile (Express API) — monorepo pnpm, multi-stage
-
-```dockerfile
-FROM node:20-alpine AS build
-RUN corepack enable
-WORKDIR /repo
-COPY . .
-RUN pnpm install --frozen-lockfile
-RUN pnpm --filter api build
-RUN pnpm --filter api deploy --prod /out
-
-FROM node:20-alpine
-WORKDIR /app
-COPY --from=build /out .
-EXPOSE 4000
-CMD ["sh", "-c", "node dist/shared/database/run-migrations.js && node dist/server.js"]
+```bash
+cd /srv/pricehub && git pull
+docker compose -f docker-compose.prod.yml --env-file .env.prod up -d --build
 ```
 
-(El script de migraciones al arrancar está por definir; el entrypoint de la API es `dist/server.js`.)
+Las migraciones nuevas se aplican solas al arrancar la API (si una falla, el container no arranca y el anterior ya fue reemplazado: mirar `logs api`). Antes de un update con migraciones, correr un backup.
 
-### Dockerfile (Python Processor)
+## Logs y estado
 
-```dockerfile
-FROM python:3.11-slim
-WORKDIR /app
-COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
-COPY . .
-CMD ["python", "main.py"]
+```bash
+dc ps
+dc logs -f api            # también: web, processor, proxy
+curl https://DOMINIO/api/v1/health    # {"status":"ok","database":"ok",...}
 ```
-
-(Si en Fase 2 se agrega OCR, sumar `tesseract-ocr` vía apt.)
-
-### Dockerfile (Next.js)
-
-Build con `output: "standalone"` (ya configurado) y runtime `node:22-alpine`. En el monorepo el server queda en `.next/standalone/apps/web/server.js`; copiar `.next/static` y `public/` al lado (`next start` no sirve con standalone).
-
-Los rewrites de `next.config.ts` (`/api/v1/*` → `API_PROXY_TARGET`) se resuelven **en build**. Con el reverse proxy ruteando `/api/*` a la API no hacen falta en producción; si se sirve la web sin proxy delante, buildear con `API_PROXY_TARGET=http://api:4000`.
-
-## Database Migrations
-
-- TypeORM CLI (`pnpm --filter api migration:run`)
-- Se ejecutan automáticamente al arrancar el container de la API
-- Nunca `synchronize: true` en producción
-- Migraciones commiteadas en `apps/api/src/shared/database/migrations/`
 
 ## Backups
 
-- `pg_dump` diario vía cron (en el host o un container dedicado), con retención (ej. 7 diarios + 4 semanales)
-- Copia off-site de los dumps (otro servidor o bucket)
-- Si los uploads se guardan en volumen local en vez de GCS, incluir ese volumen en el backup
-
-## CI/CD Pipeline
-
-```
-Push to main
-    │
-    ├── Lint (ESLint) + type check (tsc --noEmit)
-    ├── Unit tests (Vitest) + tests Python (pytest)
-    │
-    ├── Build imágenes: web, api, processor
-    ├── Push al registry (GHCR u otro)
-    │
-    └── Deploy al servidor (SSH):
-          docker compose -f docker-compose.prod.yml pull
-          docker compose -f docker-compose.prod.yml up -d
-          → health check
+```bash
+deploy/backup.sh          # deja deploy/backups/db-<fecha>.dump y uploads-<fecha>.tar.gz (gitignored)
+# cron diario, retención KEEP_DAYS (default 14):
+30 3 * * * cd /srv/pricehub && deploy/backup.sh >> deploy/backups/backup.log 2>&1
 ```
 
-## Monitoring (MVP)
+Copiar `deploy/backups/` fuera del servidor (rsync/rclone): un backup en el mismo disco no sobrevive a perder el servidor.
 
-- Logs estructurados en JSON (pino o winston), `docker compose logs` + rotación de logs de Docker
-- BullBoard para monitorear colas (protegido con password, detrás del proxy)
-- Health check: `GET /health` devuelve estado de DB y Redis
-- Uptime monitoring externo (UptimeRobot o similar)
-- Error tracking: Sentry (free tier)
+Restaurar (el `pg_restore` de un dump de `backup.sh` está probado; el de uploads, no):
 
-## Scaling Considerations (Post-MVP)
+```bash
+dc stop api processor
+dc exec -T postgres dropdb -U pricehub pricehub
+dc exec -T postgres createdb -U pricehub pricehub
+dc exec -T postgres pg_restore -U pricehub -d pricehub --no-owner < deploy/backups/db-XXXX.dump
+dc run --rm --no-deps api tar -C /data -xzf - < deploy/backups/uploads-XXXX.tar.gz   # si no se usa GCS
+dc start api processor
+```
 
-- Escalar workers Python con `docker compose up --scale processor=N`
-- Mover PostgreSQL a un servidor/servicio dedicado si la carga lo justifica
-- Múltiples réplicas de la API detrás del reverse proxy
-- Archivos: GCS ya escala; si se usa volumen local, migrar a object storage (GCS / S3 / MinIO)
+## Seguridad
+
+- `.env.prod` fuera de git (`.gitignore`), permisos 600.
+- La API no arranca en producción si `JWT_SECRET` tiene menos de 32 caracteres.
+- `trust proxy` activo (un solo proxy delante); la cookie de refresh es `Secure` en producción.
+- PostgreSQL y Redis sin puertos publicados.
+- Caddy oculta el header `Server` y agrega HSTS.
+
+## Pendiente
+
+- CI/CD: lint + tests en cada push; build de imágenes a un registry (GHCR) y deploy por SSH (`pull` + `up -d`).
+- Staging (el mismo compose con otro `DOMAIN` y otro `-p` de proyecto).
+- Monitoring: uptime externo contra `/api/v1/health`, Sentry, Redis en el health check.
+- Rate limiting en `/auth/login` (`express-rate-limit` ya es dependencia; `trust proxy` ya está para que vea la IP real).
+
+## Escalar (post-MVP)
+
+- Más workers: `dc up -d --scale processor=N`.
+- PostgreSQL en un servidor/servicio dedicado si la carga lo justifica.
+- Archivos: con volumen local no se puede escalar la API a varios hosts; pasar a GCS / S3 / MinIO.

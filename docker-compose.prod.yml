@@ -1,0 +1,113 @@
+# Production stack (self-hosted). See mds/deployment.md.
+#   cp deploy/prod.env.example .env.prod   # fill it in (never commit it)
+#   docker compose -f docker-compose.prod.yml --env-file .env.prod up -d --build
+# Only the proxy publishes ports; everything else stays on the internal network.
+name: pricehub
+
+x-restart: &restart
+  restart: unless-stopped
+  logging:
+    driver: json-file
+    options: { max-size: "10m", max-file: "5" }
+
+services:
+  proxy:
+    <<: *restart
+    image: caddy:2-alpine
+    ports:
+      - "${HTTP_PORT:-80}:80"
+      - "${HTTPS_PORT:-443}:443"
+      - "${HTTPS_PORT:-443}:443/udp"
+    environment:
+      DOMAIN: ${DOMAIN:?set DOMAIN (e.g. pricehub.example.com, or :80 for plain HTTP)}
+    volumes:
+      - ./deploy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      web: { condition: service_healthy }
+      api: { condition: service_healthy }
+
+  web:
+    <<: *restart
+    build:
+      context: .
+      dockerfile: apps/web/Dockerfile
+    image: pricehub-web
+
+  api:
+    <<: *restart
+    build:
+      context: .
+      dockerfile: apps/api/Dockerfile
+    image: pricehub-api
+    environment:
+      NODE_ENV: production
+      DB_HOST: postgres
+      DB_NAME: pricehub
+      DB_USER: pricehub
+      DB_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD}
+      REDIS_HOST: redis
+      JWT_SECRET: ${JWT_SECRET:?set JWT_SECRET (openssl rand -hex 32)}
+      COOKIE_SECURE: ${COOKIE_SECURE:-true}
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+      # Optional Google Cloud Storage; empty = files on the uploads volume.
+      GCS_BUCKET_NAME: ${GCS_BUCKET_NAME:-}
+      GCS_PROJECT_ID: ${GCS_PROJECT_ID:-}
+      GCS_KEY_FILE: ${GCS_KEY_FILE:-}
+    volumes:
+      - uploads:/data/uploads
+    depends_on:
+      postgres: { condition: service_healthy }
+      redis: { condition: service_healthy }
+
+  processor:
+    <<: *restart
+    build:
+      context: services/document-processor
+    image: pricehub-processor
+    environment:
+      REDIS_HOST: redis
+      LLM_API_KEY: ${LLM_API_KEY:-}
+      LLM_BASE_URL: ${LLM_BASE_URL:-}
+      LLM_MODEL: ${LLM_MODEL:-}
+    volumes:
+      # The API passes absolute paths under /data/uploads in the job payload.
+      - uploads:/data/uploads:ro
+    depends_on:
+      redis: { condition: service_healthy }
+
+  postgres:
+    <<: *restart
+    image: postgres:15
+    environment:
+      POSTGRES_DB: pricehub
+      POSTGRES_USER: pricehub
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U pricehub -d pricehub"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  redis:
+    <<: *restart
+    image: redis:7-alpine
+    # AOF so queued import jobs survive a restart.
+    command: ["redis-server", "--appendonly", "yes"]
+    volumes:
+      - redisdata:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  pgdata:
+  redisdata:
+  uploads:
+  caddy_data:
+  caddy_config:

@@ -1,0 +1,24 @@
+# DOMAIN=pricehub.example.com → automatic HTTPS (Let's Encrypt; ports 80/443 must reach this host).
+# DOMAIN=:80 → plain HTTP (LAN/testing; then set COOKIE_SECURE=false).
+{$DOMAIN} {
+	encode zstd gzip
+
+	# The browser always calls /api/v1 on the same origin (refresh cookie: sameSite=strict).
+	handle /api/* {
+		request_body {
+			max_size 25MB
+		}
+		reverse_proxy api:4000
+	}
+
+	handle {
+		reverse_proxy web:3000
+	}
+
+	header {
+		Strict-Transport-Security "max-age=31536000"
+		X-Content-Type-Options nosniff
+		Referrer-Policy strict-origin-when-cross-origin
+		-Server
+	}
+}

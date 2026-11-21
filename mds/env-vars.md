@@ -40,7 +40,17 @@ LOG_LEVEL=debug                # debug | info | warn | error
 
 # CORS
 CORS_ORIGIN=http://localhost:3000
+
+# Refresh cookie `Secure` flag. Default: true if NODE_ENV=production. false only for plain-HTTP deploys
+COOKIE_SECURE=
+
+# Local file storage when GCS_BUCKET_NAME is empty (the Docker image uses /data/uploads)
+LOCAL_UPLOADS_DIR=./uploads
 ```
+
+En producción (`NODE_ENV=production`) la API no arranca si `JWT_SECRET` tiene menos de 32 caracteres.
+
+Script de alta de admin (`dist/shared/database/create-admin.js`): `ADMIN_EMAIL`, `ADMIN_PASSWORD` (mín. 10), `ADMIN_NAME` (opcional).
 
 ## Frontend (Next.js)
 
@@ -70,6 +80,10 @@ LLM_CHUNK_CHARS=6000
 LLM_MAX_WORKERS=4
 LOG_LEVEL=DEBUG
 ```
+
+## Producción (`docker-compose.prod.yml`)
+
+Todo se configura con un único `.env.prod` en la raíz del servidor; plantilla en `deploy/prod.env.example`. El compose arma las variables de cada servicio (hosts internos `postgres` / `redis`, `NODE_ENV=production`). Obligatorias: `DOMAIN`, `POSTGRES_PASSWORD`, `JWT_SECRET`. Ver `mds/deployment.md`.
 
 ## Docker Compose (local development)
 

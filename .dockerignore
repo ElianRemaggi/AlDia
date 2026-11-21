@@ -1,0 +1,14 @@
+# Build context for apps/api and apps/web images (context = repo root).
+**/node_modules
+**/.next
+**/dist
+**/coverage
+**/*.tsbuildinfo
+**/.env
+**/.env.*
+.git
+.claude
+mds
+apps/api/uploads
+services
+deploy/backups

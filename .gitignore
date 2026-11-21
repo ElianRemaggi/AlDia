@@ -43,3 +43,7 @@ ormconfig.json
 
 # Local file storage (dev uploads, see shared/storage/storage.ts)
 uploads/
+
+# Production secrets and backups (see docker-compose.prod.yml)
+.env.prod
+deploy/backups/

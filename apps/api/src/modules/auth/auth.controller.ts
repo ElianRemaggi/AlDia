@@ -1,12 +1,13 @@
 import { Request, Response } from 'express';
 import * as authService from './auth.service';
+import { config } from '../../config';
 
 export async function loginHandler(req: Request, res: Response) {
   const result = await authService.login(req.body);
 
   res.cookie('refreshToken', result.refreshToken, {
     httpOnly: true,
-    secure: process.env.NODE_ENV === 'production',
+    secure: config.cookieSecure,
     sameSite: 'strict',
     maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
     path: '/api/v1/auth/refresh',

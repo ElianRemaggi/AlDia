@@ -15,7 +15,7 @@
 | 4. Remaining API (catálogo, markup, compras, notificaciones) | ✅ (con pendientes menores) |
 | 5. Frontend (`apps/web`) | ✅ F1–F5 (auth, proveedores, admin, subida de listas, catálogo, compras, notificaciones, dashboards, polish) |
 | 6. PDF parser | ✅ (adelantado; tablas + fallback LLM) |
-| Deploy (Docker en VPS / servidor propio) | ❌ No iniciado |
+| Deploy (Docker en VPS / servidor propio) | 🟡 Stack de producción listo y probado en local; falta servidor real, CI/CD y monitoreo |
 
 ---
 
@@ -233,14 +233,16 @@
 
 > Decisión (2026-11-20): se descarta Railway y Vercel. Todo se despliega con Docker en un VPS o servidor propio. Ver `mds/deployment.md`.
 
-- [ ] Dockerfile `apps/api` (multi-stage, pnpm workspace)
-- [ ] Dockerfile `services/document-processor`
-- [ ] Dockerfile `apps/web` (`output: "standalone"` ya configurado; server en `.next/standalone/apps/web/server.js`)
-- [ ] `docker-compose.prod.yml`: web, api, processor, postgres, redis, reverse proxy
-- [ ] Reverse proxy con HTTPS (Caddy o Nginx + Let's Encrypt)
-- [ ] Migraciones automáticas al arrancar la API
-- [ ] Backups de PostgreSQL + volumen de uploads
-- [ ] Endpoint `GET /health` (DB + Redis)
+- [x] Dockerfile `apps/api` (multi-stage, pnpm workspace)
+- [x] Dockerfile `services/document-processor` (con poppler + tesseract)
+- [x] Dockerfile `apps/web` (standalone)
+- [x] `docker-compose.prod.yml`: web, api, processor, postgres, redis, reverse proxy
+- [x] Reverse proxy con HTTPS (Caddy, TLS automático)
+- [x] Migraciones automáticas al arrancar la API (`migrate.js`)
+- [x] Alta de admin para producción (`create-admin.js`)
+- [x] Backups de PostgreSQL + volumen de uploads (`deploy/backup.sh`, restore probado)
+- [x] Endpoint `GET /health` con estado de la DB (falta Redis)
+- [ ] Deploy en el servidor real (dominio + DNS)
 - [ ] CI/CD: build de imágenes → registry → deploy al servidor
 - [ ] Setup staging environment
 - [ ] Monitoring: health check, Sentry, logs
