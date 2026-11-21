@@ -76,6 +76,6 @@ export async function removeItemHandler(req: Request, res: Response): Promise<vo
 
 export async function exportWhatsAppHandler(req: Request, res: Response): Promise<void> {
   const commerceId = getCommerceId(req);
-  const text = await purchaseService.exportToWhatsApp(req.params.id, commerceId);
-  res.json({ status: 'success', data: { text } });
+  const result = await purchaseService.exportToWhatsApp(req.params.id, commerceId);
+  res.json({ status: 'success', data: result });
 }

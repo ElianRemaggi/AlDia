@@ -17,6 +17,7 @@ import { useDebouncedValue } from "@/lib/hooks/use-debounced-value";
 import { useCategories, useProducts } from "@/lib/hooks/use-products";
 import { useSuppliers } from "@/lib/hooks/use-suppliers";
 import { cn } from "@/lib/utils";
+import { AddToListDialog } from "@/components/purchase-lists/add-to-list-dialog";
 import { FavoriteButton } from "./favorite-button";
 import { PriceChange } from "./price-change";
 
@@ -78,7 +79,7 @@ export function ProductsTable({ supplierId: fixedSupplierId, pageSize = 20 }: { 
   }
 
   const showSupplier = !fixedSupplierId;
-  const columns = showSupplier ? 6 : 5;
+  const columns = showSupplier ? 7 : 6;
 
   return (
     <div>
@@ -190,6 +191,9 @@ export function ProductsTable({ supplierId: fixedSupplierId, pageSize = 20 }: { 
                   <SortableHead label="Costo" by="price" sort={sort} onSort={toggleSort} align="right" />
                   <TableHead className="hidden text-right sm:table-cell">Precio de venta</TableHead>
                   <SortableHead label="Último cambio" by="change" sort={sort} onSort={toggleSort} align="right" />
+                  <TableHead className="w-10">
+                    <span className="sr-only">Agregar a lista</span>
+                  </TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -235,6 +239,9 @@ export function ProductsTable({ supplierId: fixedSupplierId, pageSize = 20 }: { 
                       </TableCell>
                       <TableCell className="text-right">
                         <PriceChange percentage={product.changePercentage} previousPrice={product.previousPrice} />
+                      </TableCell>
+                      <TableCell>
+                        <AddToListDialog product={product} />
                       </TableCell>
                     </TableRow>
                   ))

@@ -32,6 +32,7 @@ export async function onJobCompleted(result: JobResult): Promise<void> {
       ImportJobStatus.FAILED,
       errorMessage ?? 'Parse failed',
     );
+    await processor.notifyImportFailed(priceListId, errorMessage ?? 'Parse failed');
     return;
   }
 
@@ -72,6 +73,7 @@ export async function onJobCompleted(result: JobResult): Promise<void> {
     const msg = err instanceof Error ? err.message : String(err);
     await processor.updatePriceListStatus(priceListId, PriceListStatus.FAILED);
     await processor.updateImportJobStatus(priceListId, ImportJobStatus.FAILED, msg);
+    await processor.notifyImportFailed(priceListId, msg);
   }
 }
 
@@ -79,6 +81,7 @@ export async function onJobCompleted(result: JobResult): Promise<void> {
 export async function onJobFailed(priceListId: string, reason: string): Promise<void> {
   await processor.updatePriceListStatus(priceListId, PriceListStatus.FAILED);
   await processor.updateImportJobStatus(priceListId, ImportJobStatus.FAILED, reason);
+  await processor.notifyImportFailed(priceListId, reason);
 }
 
 /** BullMQ serializes return values as JSON strings in queue events. */

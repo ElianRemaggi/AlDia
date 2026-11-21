@@ -34,6 +34,7 @@ export function ImportJobProgress({
     void queryClient.invalidateQueries({ queryKey: queryKeys.priceLists.bySupplier(supplierId) });
     // New prices → catalog, categories and price history change too.
     void queryClient.invalidateQueries({ queryKey: queryKeys.products.all });
+    void queryClient.invalidateQueries({ queryKey: queryKeys.notifications.all });
     if (job.status === "completed") toast.success(`Lista importada: ${summary(job)}`);
     else toast.error("La importación falló");
   }, [job, queryClient, supplierId]);

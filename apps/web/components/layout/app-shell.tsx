@@ -5,6 +5,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
   Building2Icon,
+  ClipboardListIcon,
   HomeIcon,
   LogOutIcon,
   PackageIcon,
@@ -12,6 +13,7 @@ import {
   UsersIcon,
   type LucideIcon,
 } from "lucide-react";
+import { NotificationBell } from "@/components/notifications/notification-bell";
 import { ButtonLink } from "@/components/shared/button-link";
 import { Button } from "@/components/ui/button";
 import {
@@ -37,6 +39,7 @@ const NAV: Record<"commerce" | "admin", NavItem[]> = {
   commerce: [
     { href: "/", label: "Inicio", icon: HomeIcon, exact: true },
     { href: "/products", label: "Productos", icon: PackageIcon },
+    { href: "/purchase-lists", label: "Listas de compra", icon: ClipboardListIcon },
     { href: "/suppliers", label: "Proveedores", icon: TruckIcon },
   ],
   admin: [
@@ -81,7 +84,8 @@ export function AppShell({
               </ButtonLink>
             ))}
           </nav>
-          <div className="ml-auto">
+          <div className="ml-auto flex items-center gap-1">
+            {variant === "commerce" && <NotificationBell />}
             <UserMenu />
           </div>
         </header>

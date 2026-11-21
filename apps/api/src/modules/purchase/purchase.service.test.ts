@@ -21,16 +21,18 @@ import {
   updatePurchaseItem,
   removePurchaseItem,
   exportToWhatsApp,
+  toWhatsAppNumber,
 } from './purchase.service';
 import { PurchaseListStatus } from './entities/purchase-list.entity';
 
 function createMockQb() {
   const qb: Record<string, ReturnType<typeof vi.fn>> = {};
-  const chainMethods = ['select', 'innerJoin', 'where', 'orderBy'];
+  const chainMethods = ['select', 'addSelect', 'innerJoin', 'where', 'orderBy', 'groupBy'];
   for (const m of chainMethods) {
     qb[m] = vi.fn().mockImplementation(() => qb);
   }
   qb['getRawOne'] = vi.fn().mockResolvedValue(null);
+  qb['getRawMany'] = vi.fn().mockResolvedValue([]);
   return qb;
 }
 
@@ -58,11 +60,35 @@ describe('purchase.service', () => {
 
       const result = await listPurchaseLists('commerce-uuid-1', 1, 20);
 
-      expect(result.data).toEqual(lists);
+      expect(result.data).toEqual([
+        { ...lists[0], itemCount: 0, supplierCount: 0, estimatedTotal: 0 },
+      ]);
       expect(result.meta).toEqual({ total: 1, page: 1, limit: 20, totalPages: 1 });
       expect(mockRepo.findAndCount).toHaveBeenCalledWith(
         expect.objectContaining({ where: { commerceId: 'commerce-uuid-1' } }),
       );
+    });
+  });
+
+  describe('listPurchaseLists totals', () => {
+    it('adds item count, supplier count and estimated total per list', async () => {
+      const lists = [createPurchaseListFixture({ id: 'pl-1' }), createPurchaseListFixture({ id: 'pl-2' })];
+      mockRepo.findAndCount.mockResolvedValue([lists, 2]);
+      mockQb.getRawMany.mockResolvedValue([
+        { listId: 'pl-1', itemCount: 3, supplierCount: 2, estimatedTotal: '4500.50' },
+      ]);
+
+      const result = await listPurchaseLists('commerce-uuid-1', 1, 20);
+
+      expect(result.data[0]).toMatchObject({ itemCount: 3, supplierCount: 2, estimatedTotal: 4500.5 });
+      expect(result.data[1]).toMatchObject({ itemCount: 0, supplierCount: 0, estimatedTotal: 0 });
+      expect(mockQb.where).toHaveBeenCalledWith('i.purchaseListId IN (:...ids)', { ids: ['pl-1', 'pl-2'] });
+    });
+
+    it('skips the totals query for an empty page', async () => {
+      mockRepo.findAndCount.mockResolvedValue([[], 0]);
+      await listPurchaseLists('commerce-uuid-1', 1, 20);
+      expect(mockRepo.createQueryBuilder).not.toHaveBeenCalled();
     });
   });
 
@@ -156,7 +182,8 @@ describe('purchase.service', () => {
       const product = createSupplierProductFixture();
       mockRepo.findOne
         .mockResolvedValueOnce(list)     // purchase list check
-        .mockResolvedValueOnce(product); // supplier product check
+        .mockResolvedValueOnce(product)  // supplier product check
+        .mockResolvedValueOnce(null);    // not in the list yet
       mockQb.getRawOne.mockResolvedValue({ unitCost: '100.00' });
       mockRepo.create.mockImplementation((data: unknown) => ({ ...data as object }));
       mockRepo.save.mockImplementation(async (e: unknown) => ({ ...e as object, id: 'item-id' }));
@@ -178,12 +205,31 @@ describe('purchase.service', () => {
       expect(result).toHaveProperty('id');
     });
 
+    it('should add to the quantity when the product is already in the list', async () => {
+      const existing = createPurchaseListItemFixture({ quantity: 2, unitCostSnapshot: '90.00' });
+      mockRepo.findOne
+        .mockResolvedValueOnce(createPurchaseListFixture())
+        .mockResolvedValueOnce(createSupplierProductFixture())
+        .mockResolvedValueOnce(existing);
+      mockRepo.save.mockImplementation(async (e: unknown) => e);
+
+      const result = await addPurchaseItem('pl-uuid-1', 'commerce-uuid-1', {
+        supplierProductId: 'sp-uuid-1',
+        quantity: 3,
+      });
+
+      expect(result).toMatchObject({ quantity: 5, unitCostSnapshot: '90.00' });
+      expect(mockRepo.create).not.toHaveBeenCalled();
+      expect(mockQb.getRawOne).not.toHaveBeenCalled();
+    });
+
     it('should throw 422 when no price available', async () => {
       const list = createPurchaseListFixture();
       const product = createSupplierProductFixture();
       mockRepo.findOne
         .mockResolvedValueOnce(list)
-        .mockResolvedValueOnce(product);
+        .mockResolvedValueOnce(product)
+        .mockResolvedValueOnce(null);
       mockQb.getRawOne.mockResolvedValue(null);
 
       await expect(
@@ -264,75 +310,85 @@ describe('purchase.service', () => {
   });
 
   describe('exportToWhatsApp', () => {
-    it('should export list as WhatsApp-formatted text', async () => {
-      const list = createPurchaseListFixture({ name: 'Pedido Semana 1' });
-      const supplier = { id: 'supplier-uuid-1', name: 'Proveedor ABC' };
-      const product = createSupplierProductFixture({
-        name: 'Coca Cola 1.5L',
-        supplierId: 'supplier-uuid-1',
-        supplier,
-      });
-      const item = createPurchaseListItemFixture({
-        quantity: 5,
-        unitCostSnapshot: '200.00',
-        supplierProduct: product,
-      });
-
+    function setup() {
+      const list = createPurchaseListFixture({ name: 'Pedido semanal' });
+      const central = { id: 'sup-1', name: 'Distribuidora Central', contactPhone: '011 2345-6789' };
+      const sur = { id: 'sup-2', name: 'Bebidas del Sur', contactPhone: null };
+      const items = [
+        createPurchaseListItemFixture({
+          id: 'i-1',
+          quantity: 6,
+          unitCostSnapshot: '3600.00',
+          supplierProduct: createSupplierProductFixture({
+            name: 'Aceite Girasol 1.5L', supplierProductCode: 'C-001', unit: 'unidad', supplierId: 'sup-1', supplier: central,
+          }),
+        }),
+        createPurchaseListItemFixture({
+          id: 'i-2',
+          quantity: 10,
+          unitCostSnapshot: '1140.00',
+          supplierProduct: createSupplierProductFixture({
+            name: 'Arroz Largo Fino', supplierProductCode: null, unit: 'kg', supplierId: 'sup-1', supplier: central,
+          }),
+        }),
+        createPurchaseListItemFixture({
+          id: 'i-3',
+          quantity: 12,
+          unitCostSnapshot: '1850.50',
+          supplierProduct: createSupplierProductFixture({
+            name: 'Gaseosa Cola 2.25L', supplierProductCode: 'B-1', unit: null, supplierId: 'sup-2', supplier: sur,
+          }),
+        }),
+      ];
       mockRepo.findOne.mockResolvedValue(list);
-      mockRepo.find.mockResolvedValue([item]);
+      mockRepo.find.mockResolvedValue(items);
+    }
 
-      const text = await exportToWhatsApp('pl-uuid-1', 'commerce-uuid-1');
+    it('builds one order per supplier, without prices', async () => {
+      setup();
+      const { orders } = await exportToWhatsApp('pl-uuid-1', 'commerce-uuid-1');
 
-      expect(text).toContain('Lista: Pedido Semana 1');
-      expect(text).toContain('Proveedor ABC');
-      expect(text).toContain('Coca Cola 1.5L');
-      expect(text).toContain('5 unidades');
-      expect(text).toContain('$200.00');
-      expect(text).toContain('Total estimado: $1000.00');
+      expect(orders.map((o) => o.supplierName)).toEqual(['Distribuidora Central', 'Bebidas del Sur']);
+      expect(orders[0].text).toBe(
+        'Hola! Te paso un pedido:\n\n• 6 × Aceite Girasol 1.5L (cód. C-001)\n• 10 kg × Arroz Largo Fino\n\nGracias!',
+      );
+      expect(orders[0].text).not.toContain('$');
+      expect(orders[0]).toMatchObject({ itemCount: 2, subtotal: 33000 });
     });
 
-    it('should group items by supplier', async () => {
-      const list = createPurchaseListFixture({ name: 'Test List' });
-      const supplier1 = { id: 'supplier-1', name: 'Proveedor Uno' };
-      const supplier2 = { id: 'supplier-2', name: 'Proveedor Dos' };
-      const product1 = createSupplierProductFixture({
-        id: 'sp-1',
-        name: 'Producto A',
-        supplierId: 'supplier-1',
-        supplier: supplier1,
-      });
-      const product2 = createSupplierProductFixture({
-        id: 'sp-2',
-        name: 'Producto B',
-        supplierId: 'supplier-2',
-        supplier: supplier2,
-      });
-      const item1 = createPurchaseListItemFixture({
-        id: 'item-1',
-        supplierProductId: 'sp-1',
-        quantity: 2,
-        unitCostSnapshot: '100.00',
-        supplierProduct: product1,
-      });
-      const item2 = createPurchaseListItemFixture({
-        id: 'item-2',
-        supplierProductId: 'sp-2',
-        quantity: 3,
-        unitCostSnapshot: '50.00',
-        supplierProduct: product2,
-      });
+    it('links to the supplier chat when the phone is usable, else to the contact picker', async () => {
+      setup();
+      const { orders } = await exportToWhatsApp('pl-uuid-1', 'commerce-uuid-1');
 
-      mockRepo.findOne.mockResolvedValue(list);
-      mockRepo.find.mockResolvedValue([item1, item2]);
+      expect(orders[0].whatsappUrl).toBe(`https://wa.me/5491123456789?text=${encodeURIComponent(orders[0].text)}`);
+      expect(orders[1].whatsappUrl.startsWith('https://wa.me/?text=')).toBe(true);
+    });
 
-      const text = await exportToWhatsApp('pl-uuid-1', 'commerce-uuid-1');
+    it('builds the full list with Argentine-formatted prices and total', async () => {
+      setup();
+      const { fullText } = await exportToWhatsApp('pl-uuid-1', 'commerce-uuid-1');
 
-      expect(text).toContain('Proveedor Uno');
-      expect(text).toContain('Proveedor Dos');
-      expect(text).toContain('Producto A');
-      expect(text).toContain('Producto B');
-      // Total: 2*100 + 3*50 = 350
-      expect(text).toContain('Total estimado: $350.00');
+      expect(fullText).toContain('📋 *Pedido semanal*');
+      expect(fullText).toContain('• 6 × Aceite Girasol 1.5L (cód. C-001) — $ 21.600,00');
+      expect(fullText).toContain('Subtotal: $ 33.000,00');
+      // 21.600 + 11.400 + 22.206 = 55.206
+      expect(fullText).toContain('*Total estimado: $ 55.206,00*');
+    });
+  });
+
+  describe('toWhatsAppNumber', () => {
+    it.each([
+      ['+54 9 11 2345-6789', '5491123456789'],
+      ['011 2345-6789', '5491123456789'],
+      ['11 2345 6789', '5491123456789'],
+      ['(0351) 456-7890', '5493514567890'],
+      ['0054 9 11 2345 6789', '5491123456789'],
+    ])('%s → %s', (input, expected) => {
+      expect(toWhatsAppNumber(input)).toBe(expected);
+    });
+
+    it.each([[null], [''], ['2345-6789'], ['011 15 2345-6789']])('%s → null (ambiguous)', (input) => {
+      expect(toWhatsAppNumber(input)).toBeNull();
     });
   });
 });

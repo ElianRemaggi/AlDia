@@ -13,7 +13,7 @@
 | 2. Document Processor (Excel/CSV) | ✅ |
 | 3. Import Pipeline (API + BullMQ + Python) | ✅ |
 | 4. Remaining API (catálogo, markup, compras, notificaciones) | ✅ (con pendientes menores) |
-| 5. Frontend (`apps/web`) | 🟡 F1–F3 ✅ (auth, proveedores, admin, subida de listas, catálogo). Siguen F4–F5 |
+| 5. Frontend (`apps/web`) | 🟡 F1–F4 ✅ (auth, proveedores, admin, subida de listas, catálogo, compras, notificaciones). Sigue F5 (dashboard + polish) |
 | 6. PDF parser | ✅ (adelantado; tablas + fallback LLM) |
 | Deploy (Docker en VPS / servidor propio) | ❌ No iniciado |
 
@@ -159,18 +159,20 @@
 - [x] purchase_lists + purchase_list_items entities + migration
 - [x] CRUD: GET /purchase-lists, POST, GET/:id, PATCH/:id, DELETE/:id
 - [x] POST /purchase-lists/:id/items, PATCH/:id/items/:itemId, DELETE/:id/items/:itemId
-- [x] Cambio de status (draft → exported → archived) vía PATCH /purchase-lists/:id
+- [x] Cambio de status (active → ordered → archived) vía PATCH /purchase-lists/:id
+- [x] Totales por lista en el listado; agregar un producto repetido suma la cantidad
 
 ### 5.2 WhatsApp Export ✅
 - [x] GET /purchase-lists/:id/export/whatsapp
-- [x] Formato: agrupado por proveedor, texto plano
+- [x] Formato: un mensaje por proveedor (sin precios) + link `wa.me` con teléfono AR normalizado + texto completo con precios
 
 ### 5.3 Notifications
 - [x] notifications entity + migration
 - [x] GET /notifications, GET /notifications/unread-count
 - [x] PATCH /notifications/:id/read, POST /notifications/mark-all-read
 - [x] Creación automática en: import completed, price change, price change en favorito
-- [ ] Notificación al fallar una importación (hoy solo se marca el job/price_list como failed)
+- [x] Notificación al fallar una importación (`import_failed`, migración `1710000000003`)
+- [x] Mensajes con nombre de proveedor / producto y precios
 
 ---
 
@@ -204,10 +206,10 @@
 - [x] `/products/:id` — detalle + gráfico historial de precios
 
 ### F4 — Compras + Notificaciones
-- [ ] `/purchase-lists` — lista y creación
-- [ ] `/purchase-lists/:id` — items inline edit + export WhatsApp
-- [ ] `NotificationBell` en header con polling 30s
-- [ ] `/notifications` — centro de notificaciones
+- [x] `/purchase-lists` — lista y creación
+- [x] `/purchase-lists/:id` — items inline edit + export WhatsApp (un mensaje por proveedor)
+- [x] `NotificationBell` en header con polling 30s
+- [x] `/notifications` — centro de notificaciones
 
 ### F5 — Dashboard + Polish
 - [ ] `/` — dashboard con stats reales

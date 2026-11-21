@@ -25,6 +25,17 @@ export const queryKeys = {
     history: (id: string) => ["products", "history", id] as const,
     changes: (id: string) => ["products", "changes", id] as const,
   },
+  purchaseLists: {
+    all: ["purchase-lists"] as const,
+    list: (params: object) => ["purchase-lists", "list", params] as const,
+    detail: (id: string) => ["purchase-lists", "detail", id] as const,
+    export: (id: string) => ["purchase-lists", "export", id] as const,
+  },
+  notifications: {
+    all: ["notifications"] as const,
+    list: (params: object) => ["notifications", "list", params] as const,
+    unreadCount: ["notifications", "unread-count"] as const,
+  },
   importJobs: {
     detail: (id: string) => ["import-jobs", id] as const,
   },

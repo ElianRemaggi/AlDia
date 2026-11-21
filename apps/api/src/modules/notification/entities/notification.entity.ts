@@ -13,6 +13,7 @@ export enum NotificationType {
   IMPORT_FINISHED = 'import_finished',
   PRICE_CHANGE = 'price_change',
   FAVORITE_PRICE_CHANGE = 'favorite_price_change',
+  IMPORT_FAILED = 'import_failed',
 }
 
 @Entity('notifications')

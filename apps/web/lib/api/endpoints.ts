@@ -1,5 +1,6 @@
 import { api } from "./client";
 import type {
+  AppNotification,
   Commerce,
   ImportJob,
   Paginated,
@@ -9,7 +10,12 @@ import type {
   PriceList,
   ProductDetail,
   ProductListItem,
+  PurchaseListDetail,
+  PurchaseListItem,
+  PurchaseListStatus,
+  PurchaseListSummary,
   Role,
+  SupplierOrder,
   Supplier,
   User,
 } from "./types";
@@ -148,4 +154,35 @@ export const productsApi = {
   changes: (id: string) => unwrap(api<Data<PriceChange[]>>(`/products/${id}/changes`)),
   setFavorite: (id: string, favorite: boolean) =>
     api(`/products/${id}/favorite`, { method: favorite ? "POST" : "DELETE" }),
+};
+
+// ── Purchase lists (commerce scope) ──────────────────────────────────────────
+
+export const purchaseListsApi = {
+  list: (params: { page?: number; limit?: number }) =>
+    api<Paginated<PurchaseListSummary>>("/purchase-lists", { query: { ...params } }),
+  get: (id: string) => unwrap(api<Data<PurchaseListDetail>>(`/purchase-lists/${id}`)),
+  create: (input: { name: string; notes?: string }) =>
+    unwrap(api<Data<PurchaseListDetail>>("/purchase-lists", { method: "POST", body: input })),
+  update: (id: string, input: { name?: string; status?: PurchaseListStatus; notes?: string }) =>
+    unwrap(api<Data<PurchaseListDetail>>(`/purchase-lists/${id}`, { method: "PATCH", body: input })),
+  remove: (id: string) => api(`/purchase-lists/${id}`, { method: "DELETE" }),
+  addItem: (id: string, input: { supplierProductId: string; quantity: number }) =>
+    unwrap(api<Data<PurchaseListItem>>(`/purchase-lists/${id}/items`, { method: "POST", body: input })),
+  updateItem: (id: string, itemId: string, input: { quantity: number }) =>
+    unwrap(api<Data<PurchaseListItem>>(`/purchase-lists/${id}/items/${itemId}`, { method: "PATCH", body: input })),
+  removeItem: (id: string, itemId: string) =>
+    api(`/purchase-lists/${id}/items/${itemId}`, { method: "DELETE" }),
+  exportWhatsApp: (id: string) =>
+    unwrap(api<Data<{ orders: SupplierOrder[]; fullText: string }>>(`/purchase-lists/${id}/export/whatsapp`)),
+};
+
+// ── Notifications (commerce scope) ───────────────────────────────────────────
+
+export const notificationsApi = {
+  list: (params: { page?: number; limit?: number; unreadOnly?: "true" }) =>
+    api<Paginated<AppNotification>>("/notifications", { query: { ...params } }),
+  unreadCount: () => unwrap(api<Data<{ count: number }>>("/notifications/unread-count")),
+  markRead: (id: string) => api(`/notifications/${id}/read`, { method: "PATCH" }),
+  markAllRead: () => api("/notifications/mark-all-read", { method: "POST" }),
 };

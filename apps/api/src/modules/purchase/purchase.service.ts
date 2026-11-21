@@ -4,6 +4,7 @@ import { PurchaseListItem } from './entities/purchase-list-item.entity';
 import { SupplierProduct } from '../import/entities/supplier-product.entity';
 import { PriceListItem } from '../import/entities/price-list-item.entity';
 import { AppError } from '../../shared/middleware';
+import { formatArs } from '../../shared/format';
 import {
   CreatePurchaseListDto,
   UpdatePurchaseListDto,
@@ -21,21 +22,43 @@ export async function listPurchaseLists(
   page: number,
   limit: number,
 ) {
-  const [data, total] = await purchaseListRepo().findAndCount({
+  const [lists, total] = await purchaseListRepo().findAndCount({
     where: { commerceId },
     order: { createdAt: 'DESC' },
     skip: (page - 1) * limit,
     take: limit,
   });
 
+  // Item count, supplier count and estimated total per list, in one grouped query.
+  const ids = lists.map((l) => l.id);
+  const totals: { listId: string; itemCount: number; supplierCount: number; estimatedTotal: string }[] =
+    ids.length === 0
+      ? []
+      : await purchaseListItemRepo()
+          .createQueryBuilder('i')
+          .innerJoin('i.supplierProduct', 'sp')
+          .select('i.purchaseListId', 'listId')
+          .addSelect('COUNT(*)::int', 'itemCount')
+          .addSelect('COUNT(DISTINCT sp.supplierId)::int', 'supplierCount')
+          .addSelect('COALESCE(SUM(i.unitCostSnapshot * i.quantity), 0)', 'estimatedTotal')
+          .where('i.purchaseListId IN (:...ids)', { ids })
+          .groupBy('i.purchaseListId')
+          .getRawMany();
+  const byList = new Map(totals.map((t) => [t.listId, t]));
+
+  const data = lists.map((list) => {
+    const t = byList.get(list.id);
+    return {
+      ...list,
+      itemCount: t?.itemCount ?? 0,
+      supplierCount: t?.supplierCount ?? 0,
+      estimatedTotal: Number(t?.estimatedTotal ?? 0),
+    };
+  });
+
   return {
     data,
-    meta: {
-      total,
-      page,
-      limit,
-      totalPages: Math.ceil(total / limit),
-    },
+    meta: { total, page, limit, totalPages: Math.ceil(total / limit) },
   };
 }
 
@@ -114,6 +137,16 @@ export async function addPurchaseItem(
     throw new AppError('Product not found', 404);
   }
 
+  // Adding a product that's already in the list bumps its quantity (keeps the original price snapshot).
+  const existing = await purchaseListItemRepo().findOne({
+    where: { purchaseListId, supplierProductId: dto.supplierProductId },
+  });
+  if (existing) {
+    existing.quantity += dto.quantity;
+    if (dto.notes !== undefined) existing.notes = dto.notes;
+    return purchaseListItemRepo().save(existing);
+  }
+
   // Resolve current unit_cost from latest processed price_list
   const latestPriceRow = await priceListItemRepo()
     .createQueryBuilder('pli')
@@ -189,41 +222,82 @@ export async function removePurchaseItem(
   await purchaseListItemRepo().delete({ id: itemId });
 }
 
-export async function exportToWhatsApp(id: string, commerceId: string): Promise<string> {
+export interface SupplierOrder {
+  supplierId: string;
+  supplierName: string;
+  phone: string | null;
+  /** wa.me link with the message pre-filled; without a usable phone WhatsApp asks for the contact. */
+  whatsappUrl: string;
+  itemCount: number;
+  subtotal: number;
+  /** Message for the supplier: quantities only, no prices. */
+  text: string;
+}
+
+const PLAIN_UNIT = /^(u|un|und|unid|unidad|unidades)\.?$/i;
+
+/**
+ * Argentine phone → WhatsApp number (international digits, mobile "9" included).
+ * Returns null when it can't be done reliably (no area code, or a "15" prefix we'd
+ * have to guess around); the link then lets the user pick the contact.
+ */
+export function toWhatsAppNumber(phone: string | null | undefined): string | null {
+  if (!phone) return null;
+  let digits = phone.replace(/\D/g, '');
+  if (digits.startsWith('00')) digits = digits.slice(2);
+  if (digits.startsWith('54')) return digits.length >= 12 ? digits : null;
+  if (digits.startsWith('0')) digits = digits.slice(1);
+  return digits.length === 10 ? `549${digits}` : null; // area code + number, no 15
+}
+
+function itemLine(item: PurchaseListItem): string {
+  const product = item.supplierProduct;
+  const unit = product?.unit && !PLAIN_UNIT.test(product.unit.trim()) ? ` ${product.unit.trim()}` : '';
+  const code = product?.supplierProductCode ? ` (cód. ${product.supplierProductCode})` : '';
+  return `• ${item.quantity}${unit} × ${product?.name ?? 'Producto'}${code}`;
+}
+
+/**
+ * One order message per supplier (each goes to a different WhatsApp chat), plus the
+ * whole list with prices for the commerce's own records.
+ */
+export async function exportToWhatsApp(
+  id: string,
+  commerceId: string,
+): Promise<{ orders: SupplierOrder[]; fullText: string }> {
   const list = await getPurchaseList(id, commerceId);
 
-  // Group items by supplier
-  const bySupplier = new Map<string, { supplierName: string; items: typeof list.items }>();
-
+  const groups = new Map<string, PurchaseListItem[]>();
   for (const item of list.items) {
-    const supplier = item.supplierProduct?.supplier;
     const supplierId = item.supplierProduct?.supplierId ?? 'unknown';
-    const supplierName = supplier?.name ?? 'Unknown Supplier';
-
-    if (!bySupplier.has(supplierId)) {
-      bySupplier.set(supplierId, { supplierName, items: [] });
-    }
-    bySupplier.get(supplierId)!.items.push(item);
+    groups.set(supplierId, [...(groups.get(supplierId) ?? []), item]);
   }
 
-  // Calculate total
-  const total = list.items.reduce((acc, item) => {
-    return acc + parseFloat(item.unitCostSnapshot) * item.quantity;
-  }, 0);
+  const lineTotal = (item: PurchaseListItem) => Number(item.unitCostSnapshot) * item.quantity;
 
-  let text = `📋 *Lista: ${list.name}*\n\n`;
+  const orders: SupplierOrder[] = [...groups.entries()].map(([supplierId, items]) => {
+    const supplier = items[0].supplierProduct?.supplier;
+    const supplierName = supplier?.name ?? 'Proveedor';
+    const text = [`Hola! Te paso un pedido:`, '', ...items.map(itemLine), '', 'Gracias!'].join('\n');
+    const number = toWhatsAppNumber(supplier?.contactPhone);
+    return {
+      supplierId,
+      supplierName,
+      phone: supplier?.contactPhone ?? null,
+      whatsappUrl: `https://wa.me/${number ?? ''}?text=${encodeURIComponent(text)}`,
+      itemCount: items.length,
+      subtotal: Math.round(items.reduce((sum, i) => sum + lineTotal(i), 0) * 100) / 100,
+      text,
+    };
+  });
 
-  for (const { supplierName, items } of bySupplier.values()) {
-    text += `*${supplierName}:*\n`;
-    for (const item of items) {
-      const productName = item.supplierProduct?.name ?? 'Producto desconocido';
-      const cost = parseFloat(item.unitCostSnapshot).toFixed(2);
-      text += `• ${productName} — ${item.quantity} unidades — $${cost}\n`;
-    }
-    text += '\n';
-  }
+  const total = orders.reduce((sum, o) => sum + o.subtotal, 0);
+  const sections = orders.map((order) => {
+    const items = groups.get(order.supplierId)!;
+    const lines = items.map((item) => `${itemLine(item)} — ${formatArs(lineTotal(item))}`);
+    return [`*${order.supplierName}*`, ...lines, `Subtotal: ${formatArs(order.subtotal)}`].join('\n');
+  });
+  const fullText = [`📋 *${list.name}*`, '', sections.join('\n\n'), '', `*Total estimado: ${formatArs(total)}*`].join('\n');
 
-  text += `*Total estimado: $${total.toFixed(2)}*`;
-
-  return text;
+  return { orders, fullText };
 }

@@ -17,6 +17,7 @@ vi.mock('./import.processor', () => ({
   generateNotifications: vi.fn(),
   updatePriceListStatus: vi.fn(),
   updateImportJobStatus: vi.fn(),
+  notifyImportFailed: vi.fn(),
 }));
 
 import { AppDataSource } from '../../config/data-source';
@@ -90,6 +91,7 @@ describe('import.events', () => {
       expect(processor.createPriceListItems).toHaveBeenCalledWith(PL, result.parseResult!.rows, expect.any(Map));
       expect(processor.detectPriceChanges).toHaveBeenCalledWith(PL, 'sup-1', 'com-1');
       expect(processor.generateNotifications).toHaveBeenCalledWith('com-1', PL);
+      expect(processor.notifyImportFailed).not.toHaveBeenCalled();
       expect(processor.updatePriceListStatus).toHaveBeenCalledWith(PL, PriceListStatus.PROCESSED, expect.any(Date));
       expect(processor.updateImportJobStatus).toHaveBeenCalledWith(
         PL,
@@ -120,6 +122,7 @@ describe('import.events', () => {
       expect(processor.saveParseResult).not.toHaveBeenCalled();
       expect(processor.updatePriceListStatus).toHaveBeenCalledWith(PL, PriceListStatus.FAILED);
       expect(processor.updateImportJobStatus).toHaveBeenCalledWith(PL, ImportJobStatus.FAILED, 'bad file');
+      expect(processor.notifyImportFailed).toHaveBeenCalledWith(PL, 'bad file');
     });
 
     it('marks failed if a pipeline step throws', async () => {
@@ -128,6 +131,7 @@ describe('import.events', () => {
       await onJobCompleted({ priceListId: PL, status: 'success', parseResult: parseResult(), errorMessage: null });
 
       expect(processor.updateImportJobStatus).toHaveBeenCalledWith(PL, ImportJobStatus.FAILED, 'db down');
+      expect(processor.notifyImportFailed).toHaveBeenCalledWith(PL, 'db down');
     });
   });
 
@@ -137,6 +141,7 @@ describe('import.events', () => {
 
       expect(processor.updatePriceListStatus).toHaveBeenCalledWith(PL, PriceListStatus.FAILED);
       expect(processor.updateImportJobStatus).toHaveBeenCalledWith(PL, ImportJobStatus.FAILED, 'worker crashed');
+      expect(processor.notifyImportFailed).toHaveBeenCalledWith(PL, 'worker crashed');
     });
   });
 

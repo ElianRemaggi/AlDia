@@ -36,3 +36,21 @@ export const formatMoneyTick = (value: number) =>
   Math.abs(value) >= 10_000 ? compactMoney.format(value) : wholeMoney.format(value);
 
 export const formatPercent = (value: string | number) => `${percent.format(Number(value))}%`;
+
+const relative = new Intl.RelativeTimeFormat("es-AR", { numeric: "auto" });
+const RELATIVE_STEPS: [Intl.RelativeTimeFormatUnit, number][] = [
+  ["second", 60],
+  ["minute", 60],
+  ["hour", 24],
+  ["day", 7],
+];
+
+/** "hace 5 minutos", "ayer"; older than a week → the date. */
+export function formatRelative(iso: string, now = Date.now()) {
+  let value = (new Date(iso).getTime() - now) / 1000;
+  for (const [unit, size] of RELATIVE_STEPS) {
+    if (Math.abs(value) < size) return relative.format(Math.round(value), unit);
+    value /= size;
+  }
+  return formatDate(iso);
+}

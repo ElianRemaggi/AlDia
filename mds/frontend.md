@@ -422,11 +422,14 @@ Las páginas se construyen **en orden de disponibilidad de la API**:
 - [x] Sección "Productos" en `/suppliers/:id` (misma tabla con el proveedor fijo)
 - Color de la serie: `--series-1` en `globals.css` (validado con el checker de dataviz contra las cards clara y oscura). Va **dentro** de los bloques `:root` / `.dark` del tema: agregado al final del archivo no llegaba al CSS compilado.
 
-### Fase F4 — Con API Paso 5 (Compras + Notificaciones)
-- [ ] `/purchase-lists` — lista y creación
-- [ ] `/purchase-lists/:id` — detail, items inline edit, export WhatsApp
-- [ ] `NotificationBell` en header con polling 30s
-- [ ] `/notifications` — centro de notificaciones
+### Fase F4 — ✅ Implementada (2026-11-20)
+- [x] `/purchase-lists` — listas con estado, contenido (productos · proveedores) y total estimado; "Nueva lista" (dialog)
+- [x] "Agregar a lista" (carrito) en cada fila del catálogo y en el detalle del producto: elige lista (recuerda la última) o crea una nueva, cantidad
+- [x] `/purchase-lists/:id` — ítems agrupados por proveedor, cantidad editable inline (guarda en blur/Enter, optimista), subtotales y total, quitar ítem, estado (En armado / Pedida / Archivada), borrar
+- [x] Enviar pedidos: un mensaje por proveedor con "Abrir WhatsApp" (link `wa.me` al teléfono del proveedor) y "Copiar"; "Copiar lista completa con precios"; tras enviar, "Marcar como pedida"
+- [x] `NotificationBell` en el header (polling 30s, últimas 6, ir al destino y marcar leída)
+- [x] `/notifications` — centro con filtro "solo sin leer" y "marcar todas como leídas"
+- Copiar: `lib/clipboard.ts` (fallback con `execCommand` fuera de contextos seguros, p. ej. http en LAN).
 
 ### Fase F5 — Paso 6 Dashboard + Polish
 - [ ] `/` dashboard con stats reales

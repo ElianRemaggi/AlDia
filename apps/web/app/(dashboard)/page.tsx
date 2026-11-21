@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { PackageIcon, PlusIcon, TruckIcon, type LucideIcon } from "lucide-react";
+import { ClipboardListIcon, PackageIcon, PlusIcon, TruckIcon, type LucideIcon } from "lucide-react";
 import { PageHeader } from "@/components/shared/page-header";
 import { ButtonLink } from "@/components/shared/button-link";
 import { Card, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -13,6 +13,12 @@ const SECTIONS: { href: string; title: string; description: string; icon: Lucide
     title: "Productos",
     description: "Precios actuales, precio de venta, cambios y favoritos.",
     icon: PackageIcon,
+  },
+  {
+    href: "/purchase-lists",
+    title: "Listas de compra",
+    description: "Armá pedidos y mandalos a cada proveedor por WhatsApp.",
+    icon: ClipboardListIcon,
   },
   {
     href: "/suppliers",

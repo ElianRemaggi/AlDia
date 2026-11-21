@@ -457,6 +457,65 @@ Ordena en SQL (una sola query con `LATERAL` joins), así que el orden es correct
 
 ---
 
+## Purchase lists (listas de compra)
+
+Requiere usuario `commerce`. Estados: `active` (en armado) → `ordered` (pedida) → `archived`.
+
+| Método | Ruta | Descripción |
+|--------|------|-------------|
+| GET | `/purchase-lists` | Paginado; cada lista trae `itemCount`, `supplierCount`, `estimatedTotal` |
+| POST | `/purchase-lists` | `{ name, notes? }` |
+| GET | `/purchase-lists/:id` | Lista con `items[]` (cada uno con `supplierProduct` y su `supplier`) |
+| PATCH | `/purchase-lists/:id` | `{ name?, status?, notes? }` |
+| DELETE | `/purchase-lists/:id` | Borra la lista y sus ítems |
+| POST | `/purchase-lists/:id/items` | `{ supplierProductId, quantity }`. Guarda `unitCostSnapshot` (costo actual). **Si el producto ya está en la lista, suma la cantidad.** 422 si el producto no tiene precio |
+| PATCH | `/purchase-lists/:id/items/:itemId` | `{ quantity }` |
+| DELETE | `/purchase-lists/:id/items/:itemId` | |
+| GET | `/purchase-lists/:id/export/whatsapp` | Mensajes por proveedor (ver abajo) |
+
+### GET `/purchase-lists/:id/export/whatsapp`
+
+Un pedido por proveedor (cada uno va a un chat distinto) y la lista completa con precios para el comercio.
+
+```json
+{
+  "status": "success",
+  "data": {
+    "orders": [
+      {
+        "supplierId": "uuid",
+        "supplierName": "Distribuidora Central",
+        "phone": "011 2345-6789",
+        "whatsappUrl": "https://wa.me/5491123456789?text=Hola!%20Te%20paso...",
+        "itemCount": 2,
+        "subtotal": 42480,
+        "text": "Hola! Te paso un pedido:\n\n• 8 × Aceite Girasol 1.5L (cód. C-001)\n• 12 kg × Arroz\n\nGracias!"
+      }
+    ],
+    "fullText": "📋 *Pedido UI*\n\n*Distribuidora Central*\n• 8 × Aceite ... — $ 28.800,00\nSubtotal: $ 42.480,00\n\n*Total estimado: $ 48.482,00*"
+  }
+}
+```
+
+- El mensaje al proveedor **no lleva precios**; la unidad se agrega si no es "unidad" (`12 kg × Arroz`).
+- `whatsappUrl`: teléfono argentino normalizado (`toWhatsAppNumber`: `+54 9 11…`, `011 …`, `11 …`, `0351 …` → `549…`). Si el número es ambiguo (sin código de área, con `15`) el link es `https://wa.me/?text=…` y WhatsApp pide elegir el contacto.
+- Montos con `Intl` es-AR (`$ 1.500,50`, con espacio no separable).
+
+---
+
+## Notifications
+
+| Método | Ruta | Descripción |
+|--------|------|-------------|
+| GET | `/notifications` | Paginado, `unreadOnly=true` opcional |
+| GET | `/notifications/unread-count` | `{ count }` (el frontend lo consulta cada 30s) |
+| PATCH | `/notifications/:id/read` | |
+| POST | `/notifications/mark-all-read` | |
+
+Tipos (`type`): `import_finished`, `import_failed`, `price_change` (resumen de la lista), `favorite_price_change` (uno por favorito que cambió, con nombre y precios). `metadataJson` trae `supplierId`, `priceListId` y/o `supplierProductId` para linkear.
+
+---
+
 ## Health Check
 
 ### GET `/health`

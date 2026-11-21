@@ -131,3 +131,64 @@ export interface PriceChange {
   changePercentage: string;
   createdAt: string;
 }
+
+export type PurchaseListStatus = "active" | "ordered" | "archived";
+
+export interface PurchaseListSummary {
+  id: string;
+  name: string;
+  status: PurchaseListStatus;
+  notes: string | null;
+  createdAt: string;
+  updatedAt: string;
+  itemCount: number;
+  supplierCount: number;
+  estimatedTotal: number;
+}
+
+export interface PurchaseListItem {
+  id: string;
+  supplierProductId: string;
+  quantity: number;
+  /** Supplier cost when the item was added. */
+  unitCostSnapshot: string;
+  notes: string | null;
+  supplierProduct: {
+    id: string;
+    name: string;
+    supplierProductCode: string | null;
+    unit: string | null;
+    supplierId: string;
+    supplier: { id: string; name: string };
+  };
+}
+
+export interface PurchaseListDetail extends Omit<PurchaseListSummary, "itemCount" | "supplierCount" | "estimatedTotal"> {
+  items: PurchaseListItem[];
+}
+
+export interface SupplierOrder {
+  supplierId: string;
+  supplierName: string;
+  phone: string | null;
+  whatsappUrl: string;
+  itemCount: number;
+  subtotal: number;
+  text: string;
+}
+
+export type NotificationType = "import_finished" | "import_failed" | "price_change" | "favorite_price_change";
+
+export interface AppNotification {
+  id: string;
+  type: NotificationType;
+  title: string;
+  message: string;
+  isRead: boolean;
+  metadataJson: {
+    priceListId?: string;
+    supplierId?: string;
+    supplierProductId?: string;
+  } | null;
+  createdAt: string;
+}

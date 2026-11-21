@@ -1,4 +1,6 @@
+import { In } from 'typeorm';
 import { AppDataSource } from '../../config/data-source';
+import { formatArs, formatPct } from '../../shared/format';
 import { SupplierProduct } from './entities/supplier-product.entity';
 import { PriceList, PriceListStatus } from './entities/price-list.entity';
 import { PriceListItem } from './entities/price-list-item.entity';
@@ -206,55 +208,82 @@ export async function generateNotifications(
   commerceId: string,
   priceListId: string,
 ): Promise<void> {
-  // 1. Load price list to get supplierId and name
-  const priceList = await priceListRepo().findOne({ where: { id: priceListId } });
+  const priceList = await priceListRepo().findOne({
+    where: { id: priceListId },
+    relations: ['supplier'],
+  });
   if (!priceList) return;
+  const supplierName = priceList.supplier?.name ?? 'tu proveedor';
+  const itemCount = await priceListItemRepo().count({ where: { priceListId } });
 
-  // 2. Create import_finished notification
+  // 1. Import finished
   await createNotification(
     commerceId,
     NotificationType.IMPORT_FINISHED,
-    'Importación completada',
-    `La lista de precios fue procesada exitosamente.`,
-    { priceListId, supplierId: priceList.supplierId },
+    `Lista de ${supplierName} importada`,
+    `Versión ${priceList.versionNumber}: ${itemCount} ${itemCount === 1 ? 'producto' : 'productos'}.`,
+    { priceListId, supplierId: priceList.supplierId, versionNumber: priceList.versionNumber, itemCount },
   );
 
-  // 3. Load all price_change_events for this price list
+  // 2. Price changes detected in this list
   const changeEvents = await priceChangeEventRepo().find({
     where: { detectedInPriceListId: priceListId, commerceId },
+    relations: ['supplierProduct'],
   });
-
   if (changeEvents.length === 0) return;
 
-  // 4. Find favorites (commerce_product_supplier_links where is_favorite = true)
+  // 3. One notification per changed favorite, naming the product and both prices
   const favoriteLinks = await AppDataSource.getRepository(CommerceProductSupplierLink).find({
-    where: { commerceId, isFavorite: true },
+    where: {
+      commerceId,
+      isFavorite: true,
+      supplierProductId: In(changeEvents.map((e) => e.supplierProductId)),
+    },
   });
-  const favoriteProductIds = new Set(favoriteLinks.map((l) => l.supplierProductId));
+  const favoriteIds = new Set(favoriteLinks.map((l) => l.supplierProductId));
 
-  // 5. Create favorite_price_change notification for each affected favorite
   for (const event of changeEvents) {
-    if (favoriteProductIds.has(event.supplierProductId)) {
-      await createNotification(
-        commerceId,
-        NotificationType.FAVORITE_PRICE_CHANGE,
-        'Cambio de precio en favorito',
-        `El precio de un producto favorito cambió un ${event.changePercentage}%.`,
-        {
-          priceChangeEventId: event.id,
-          supplierProductId: event.supplierProductId,
-          changePercentage: event.changePercentage,
-        },
-      );
-    }
+    if (!favoriteIds.has(event.supplierProductId)) continue;
+    const productName = event.supplierProduct?.name ?? 'Un producto favorito';
+    await createNotification(
+      commerceId,
+      NotificationType.FAVORITE_PRICE_CHANGE,
+      `${productName}: ${formatPct(event.changePercentage)}`,
+      `${supplierName}: ${formatArs(event.oldPrice)} → ${formatArs(event.newPrice)}.`,
+      {
+        priceChangeEventId: event.id,
+        supplierProductId: event.supplierProductId,
+        supplierId: priceList.supplierId,
+        changePercentage: event.changePercentage,
+      },
+    );
   }
 
-  // 6. Create summary price_change notification
+  // 4. Summary of the list's changes
+  const ups = changeEvents.filter((e) => Number(e.changePercentage) > 0).length;
+  const downs = changeEvents.length - ups;
   await createNotification(
     commerceId,
     NotificationType.PRICE_CHANGE,
-    `${changeEvents.length} cambios de precio detectados`,
-    `Se detectaron ${changeEvents.length} cambios de precio en la última importación.`,
-    { priceListId, supplierId: priceList.supplierId, changeCount: changeEvents.length },
+    `${changeEvents.length} ${changeEvents.length === 1 ? 'cambio' : 'cambios'} de precio en ${supplierName}`,
+    `${ups} ${ups === 1 ? 'suba' : 'subas'} y ${downs} ${downs === 1 ? 'baja' : 'bajas'} en la versión ${priceList.versionNumber}.`,
+    { priceListId, supplierId: priceList.supplierId, changeCount: changeEvents.length, ups, downs },
+  );
+}
+
+/** The import failed (parser error or pipeline crash): tell the commerce, the upload page may be long closed. */
+export async function notifyImportFailed(priceListId: string, reason: string): Promise<void> {
+  const priceList = await priceListRepo().findOne({
+    where: { id: priceListId },
+    relations: ['supplier'],
+  });
+  if (!priceList) return;
+  const supplierName = priceList.supplier?.name ?? 'tu proveedor';
+  await createNotification(
+    priceList.commerceId,
+    NotificationType.IMPORT_FAILED,
+    `No se pudo importar la lista de ${supplierName}`,
+    `${priceList.sourceFileName ?? 'El archivo'}: ${reason}`,
+    { priceListId, supplierId: priceList.supplierId },
   );
 }

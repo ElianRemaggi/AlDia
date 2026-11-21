@@ -3,6 +3,7 @@
 import { use } from "react";
 import Link from "next/link";
 import { FavoriteButton } from "@/components/products/favorite-button";
+import { AddToListDialog } from "@/components/purchase-lists/add-to-list-dialog";
 import { PriceChange } from "@/components/products/price-change";
 import { PriceHistoryChart } from "@/components/products/price-history-chart";
 import { ButtonLink } from "@/components/shared/button-link";
@@ -48,7 +49,12 @@ export function ProductDetail({ params }: { params: Promise<{ id: string }> }) {
             {p.supplierProductCode && <> · Código {p.supplierProductCode}</>}
           </>
         }
-        actions={<FavoriteButton productId={p.id} productName={p.name} isFavorite={p.isFavorite} size="icon" />}
+        actions={
+          <>
+            <AddToListDialog product={p} variant="button" />
+            <FavoriteButton productId={p.id} productName={p.name} isFavorite={p.isFavorite} size="icon" />
+          </>
+        }
       />
 
       <div className="mb-6 grid gap-4 sm:grid-cols-3">
