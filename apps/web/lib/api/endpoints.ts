@@ -4,7 +4,11 @@ import type {
   ImportJob,
   Paginated,
   PriceFormat,
+  PriceChange,
+  PriceHistoryEntry,
   PriceList,
+  ProductDetail,
+  ProductListItem,
   Role,
   Supplier,
   User,
@@ -119,4 +123,29 @@ export const importApi = {
     );
   },
   getJob: (id: string) => unwrap(api<Data<ImportJob>>(`/import-jobs/${id}`)),
+};
+
+// ── Catalog (commerce scope) ─────────────────────────────────────────────────
+
+export interface ProductListParams {
+  page?: number;
+  limit?: number;
+  search?: string;
+  supplierId?: string;
+  category?: string;
+  favoritesOnly?: "true";
+  hasRecentChange?: "true";
+  sortBy?: "name" | "price" | "change";
+  sortOrder?: "ASC" | "DESC";
+}
+
+export const productsApi = {
+  list: (params: ProductListParams) =>
+    api<Paginated<ProductListItem>>("/products", { query: { ...params } }),
+  categories: () => unwrap(api<Data<string[]>>("/products/categories")),
+  get: (id: string) => unwrap(api<Data<ProductDetail>>(`/products/${id}`)),
+  priceHistory: (id: string) => unwrap(api<Data<PriceHistoryEntry[]>>(`/products/${id}/price-history`)),
+  changes: (id: string) => unwrap(api<Data<PriceChange[]>>(`/products/${id}/changes`)),
+  setFavorite: (id: string, favorite: boolean) =>
+    api(`/products/${id}/favorite`, { method: favorite ? "POST" : "DELETE" }),
 };

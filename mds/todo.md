@@ -13,7 +13,7 @@
 | 2. Document Processor (Excel/CSV) | ✅ |
 | 3. Import Pipeline (API + BullMQ + Python) | ✅ |
 | 4. Remaining API (catálogo, markup, compras, notificaciones) | ✅ (con pendientes menores) |
-| 5. Frontend (`apps/web`) | 🟡 F1 ✅ F2 ✅ (auth, proveedores, admin, subida de listas). Siguen F3–F5 |
+| 5. Frontend (`apps/web`) | 🟡 F1–F3 ✅ (auth, proveedores, admin, subida de listas, catálogo). Siguen F4–F5 |
 | 6. PDF parser | ✅ (adelantado; tablas + fallback LLM) |
 | Deploy (Docker en VPS / servidor propio) | ❌ No iniciado |
 
@@ -123,7 +123,8 @@
 
 ### 3.3 Product Listing
 - [x] GET /products — vista cross-supplier con precio actual, cambio %, favorito
-- [x] Filtros, sort y paginación
+- [x] Filtros (incl. `hasRecentChange`, búsqueda por código), sort por nombre/precio/cambio en SQL, paginación
+- [x] GET /products/categories
 - [x] GET /products/:id
 
 ### 3.4 Favorites
@@ -198,9 +199,9 @@
 - [x] Toasts al completar/fallar importación
 
 ### F3 — Catálogo
-- [ ] `/products` — tabla con todos los filtros
-- [ ] Toggle favorito con optimistic update
-- [ ] `/products/:id` — detalle + gráfico historial de precios
+- [x] `/products` — tabla con todos los filtros
+- [x] Toggle favorito con optimistic update
+- [x] `/products/:id` — detalle + gráfico historial de precios
 
 ### F4 — Compras + Notificaciones
 - [ ] `/purchase-lists` — lista y creación

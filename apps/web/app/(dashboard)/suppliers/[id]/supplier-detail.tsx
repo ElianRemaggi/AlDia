@@ -4,6 +4,7 @@ import { use, useState } from "react";
 import { PencilIcon, PowerIcon, PowerOffIcon, UploadIcon } from "lucide-react";
 import { toast } from "sonner";
 import { PriceListTable } from "@/components/price-lists/price-list-table";
+import { ProductsTable } from "@/components/products/products-table";
 import { ButtonLink } from "@/components/shared/button-link";
 import { ConfirmDialog } from "@/components/shared/confirm-dialog";
 import { PageHeader } from "@/components/shared/page-header";
@@ -25,7 +26,7 @@ export function SupplierDetail({ params }: { params: Promise<{ id: string }> }) 
 
   if (query.isPending) return <Skeleton className="h-40 w-full max-w-2xl" />;
   if (query.isError) {
-    if (query.error instanceof ApiError && query.error.status === 404) {
+    if (query.error instanceof ApiError && (query.error.status === 404 || query.error.status === 400)) {
       return (
         <EmptyState
           title="Proveedor no encontrado"
@@ -112,6 +113,13 @@ export function SupplierDetail({ params }: { params: Promise<{ id: string }> }) 
             )
           }
         />
+      </section>
+
+      <section aria-labelledby="products-heading" className="mb-8">
+        <h2 id="products-heading" className="mb-3 text-lg font-semibold">
+          Productos
+        </h2>
+        <ProductsTable supplierId={supplier.id} pageSize={10} />
       </section>
 
       <Card className="max-w-2xl">

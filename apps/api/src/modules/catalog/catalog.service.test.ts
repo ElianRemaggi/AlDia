@@ -7,12 +7,13 @@ import {
 import { MarkupRule, MarkupScopeType } from '../markup/entities/markup-rule.entity';
 
 vi.mock('../../config/data-source', () => ({
-  AppDataSource: { getRepository: vi.fn() },
+  AppDataSource: { getRepository: vi.fn(), query: vi.fn() },
 }));
 
 import { AppDataSource } from '../../config/data-source';
 import {
   listProducts,
+  listCategories,
   getProduct,
   getPriceHistory,
   getPriceChanges,
@@ -57,107 +58,152 @@ describe('catalog.service', () => {
   });
 
   describe('listProducts', () => {
-    it('should return paginated products with meta', async () => {
-      const products = [createSupplierProductFixture()];
-      mockQb.getManyAndCount.mockResolvedValue([products, 1]);
-      mockRepo.find.mockResolvedValue([]);
+    const baseQuery = {
+      page: 1,
+      limit: 20,
+      sortBy: 'name' as const,
+      sortOrder: 'ASC' as const,
+      favoritesOnly: false,
+      hasRecentChange: false,
+    };
 
-      const result = await listProducts('commerce-uuid-1', {
-        page: 1,
-        limit: 20,
-        sortOrder: 'ASC',
-        favoritesOnly: false,
+    function productRow(overrides: Record<string, unknown> = {}) {
+      return {
+        id: 'sp-1',
+        supplier_id: 'supplier-uuid-1',
+        supplier_name: 'Distribuidora',
+        supplier_product_code: 'A-1',
+        name: 'Leche',
+        description: null,
+        unit: 'unidad',
+        brand: null,
+        category: 'Lacteos',
+        unit_cost: '1000.00',
+        previous_price: '900.00',
+        change_percentage: '11.11',
+        last_change_at: new Date('2026-11-01'),
+        is_favorite: false,
+        commerce_product_id: null,
+        ...overrides,
+      };
+    }
+
+    /** First call = COUNT, second = rows. */
+    function mockQuery(rows: unknown[], total = rows.length) {
+      vi.mocked(AppDataSource.query).mockResolvedValueOnce([{ total }]).mockResolvedValueOnce(rows);
+    }
+    const sqlOf = (call: number) => vi.mocked(AppDataSource.query).mock.calls[call][0] as string;
+    const paramsOf = (call: number) => vi.mocked(AppDataSource.query).mock.calls[call][1] as unknown[];
+
+    it('returns mapped rows and pagination meta', async () => {
+      mockQuery([productRow()], 41);
+
+      const result = await listProducts('commerce-uuid-1', { ...baseQuery, page: 2 });
+
+      expect(result.meta).toEqual({ total: 41, page: 2, limit: 20, totalPages: 3 });
+      expect(result.data[0]).toMatchObject({
+        id: 'sp-1',
+        supplier: { id: 'supplier-uuid-1', name: 'Distribuidora' },
+        supplierProductCode: 'A-1',
+        unitCost: '1000.00',
+        previousPrice: '900.00',
+        changePercentage: '11.11',
+        isFavorite: false,
       });
-
-      expect(result.meta).toEqual({ total: 1, page: 1, limit: 20, totalPages: 1 });
-      expect(result.data).toHaveLength(1);
+      // LIMIT / OFFSET are the last two params of the rows query
+      expect(paramsOf(1).slice(-2)).toEqual([20, 20]);
     });
 
-    it('should apply supplierId filter', async () => {
-      mockQb.getManyAndCount.mockResolvedValue([[], 0]);
-      mockRepo.find.mockResolvedValue([]);
+    it('always scopes by commerce and active products', async () => {
+      mockQuery([]);
+      await listProducts('commerce-uuid-1', baseQuery);
 
+      expect(sqlOf(0)).toContain('sp.commerce_id = $1');
+      expect(sqlOf(0)).toContain('sp.is_active = true');
+      expect(paramsOf(0)[0]).toBe('commerce-uuid-1');
+    });
+
+    it('adds parameterized filters', async () => {
+      mockQuery([]);
       await listProducts('commerce-uuid-1', {
-        page: 1,
-        limit: 20,
+        ...baseQuery,
         supplierId: 'supplier-uuid-1',
-        sortOrder: 'ASC',
-        favoritesOnly: false,
-      });
-
-      expect(mockQb.andWhere).toHaveBeenCalledWith('sp.supplierId = :supplierId', {
-        supplierId: 'supplier-uuid-1',
-      });
-    });
-
-    it('should apply category filter', async () => {
-      mockQb.getManyAndCount.mockResolvedValue([[], 0]);
-      mockRepo.find.mockResolvedValue([]);
-
-      await listProducts('commerce-uuid-1', {
-        page: 1,
-        limit: 20,
-        category: 'Beverages',
-        sortOrder: 'ASC',
-        favoritesOnly: false,
-      });
-
-      expect(mockQb.andWhere).toHaveBeenCalledWith('sp.category = :category', {
-        category: 'Beverages',
-      });
-    });
-
-    it('should apply search filter with ILIKE', async () => {
-      mockQb.getManyAndCount.mockResolvedValue([[], 0]);
-      mockRepo.find.mockResolvedValue([]);
-
-      await listProducts('commerce-uuid-1', {
-        page: 1,
-        limit: 20,
-        search: 'coca',
-        sortOrder: 'ASC',
-        favoritesOnly: false,
-      });
-
-      expect(mockQb.andWhere).toHaveBeenCalledWith('sp.name ILIKE :search', {
-        search: '%coca%',
-      });
-    });
-
-    it('should apply favoritesOnly filter', async () => {
-      mockQb.getManyAndCount.mockResolvedValue([[], 0]);
-      mockRepo.find.mockResolvedValue([]);
-
-      await listProducts('commerce-uuid-1', {
-        page: 1,
-        limit: 20,
+        category: 'Lacteos',
+        search: 'lech',
         favoritesOnly: true,
-        sortOrder: 'ASC',
+        hasRecentChange: true,
       });
 
-      expect(mockQb.andWhere).toHaveBeenCalledWith('cpsl.is_favorite = true');
+      const sql = sqlOf(0);
+      expect(sql).toContain('sp.supplier_id = $2');
+      expect(sql).toContain('sp.category = $3');
+      expect(sql).toContain('(sp.name ILIKE $4 OR sp.supplier_product_code ILIKE $4)');
+      expect(sql).toContain('fav.is_favorite IS TRUE');
+      expect(sql).toContain('chg.created_at >= now() - make_interval(days => 30)');
+      expect(paramsOf(0)).toEqual(['commerce-uuid-1', 'supplier-uuid-1', 'Lacteos', '%lech%']);
     });
 
-    it('should enrich products with unitCost and isFavorite', async () => {
-      const product = createSupplierProductFixture({ id: 'sp-uuid-1' });
-      mockQb.getManyAndCount.mockResolvedValue([[product], 1]);
-      mockQb.getRawMany
-        .mockResolvedValueOnce([{ supplierProductId: 'sp-uuid-1', unitCost: '100.00' }])
-        .mockResolvedValueOnce([{ supplierProductId: 'sp-uuid-1', changePercentage: '5.00' }]);
+    it.each([
+      ['name', 'ASC', 'ORDER BY sp.name ASC NULLS LAST'],
+      ['price', 'DESC', 'ORDER BY cur.unit_cost DESC NULLS LAST'],
+      ['change', 'DESC', 'ORDER BY chg.change_percentage DESC NULLS LAST'],
+    ] as const)('sorts by %s %s with a stable tiebreak', async (sortBy, sortOrder, expected) => {
+      mockQuery([]);
+      await listProducts('commerce-uuid-1', { ...baseQuery, sortBy, sortOrder });
+
+      expect(sqlOf(1)).toContain(`${expected}, sp.name ASC, sp.id ASC`);
+    });
+
+    it('skips loading markup rules when the page is empty', async () => {
+      mockQuery([]);
+      await listProducts('commerce-uuid-1', baseQuery);
+      expect(mockRepo.find).not.toHaveBeenCalled();
+    });
+
+    it('applies the supplier markup rule', async () => {
+      mockQuery([productRow()]);
       mockRepo.find.mockResolvedValue([
-        { supplierProductId: 'sp-uuid-1', isFavorite: true },
+        createMarkupRuleFixture({ supplierId: 'supplier-uuid-1', markupPercentage: '30.00' }),
       ]);
 
-      const result = await listProducts('commerce-uuid-1', {
-        page: 1,
-        limit: 20,
-        sortOrder: 'ASC',
-        favoritesOnly: false,
-      });
+      const result = await listProducts('commerce-uuid-1', baseQuery);
 
-      expect(result.data[0]).toHaveProperty('unitCost', '100.00');
-      expect(result.data[0]).toHaveProperty('changePercentage', '5.00');
-      expect(result.data[0]).toHaveProperty('isFavorite', true);
+      expect(result.data[0]).toMatchObject({ markupPercentage: 30, salePrice: 1300 });
+    });
+
+    it('prefers the commerce_product rule of a linked product', async () => {
+      mockQuery([productRow({ commerce_product_id: 'cp-1', is_favorite: true })]);
+      mockRepo.find.mockResolvedValue([
+        createMarkupRuleFixture({ supplierId: 'supplier-uuid-1', markupPercentage: '30.00' }),
+        createMarkupRuleFixture({
+          scopeType: MarkupScopeType.COMMERCE_PRODUCT,
+          supplierId: null,
+          commerceProductId: 'cp-1',
+          markupPercentage: '40.00',
+        }),
+      ]);
+
+      const result = await listProducts('commerce-uuid-1', baseQuery);
+
+      expect(result.data[0]).toMatchObject({ markupPercentage: 40, salePrice: 1400, isFavorite: true });
+    });
+
+    it('returns null salePrice without a price', async () => {
+      mockQuery([productRow({ unit_cost: null })]);
+      mockRepo.find.mockResolvedValue([createMarkupRuleFixture({ markupPercentage: '50.00' })]);
+
+      const result = await listProducts('commerce-uuid-1', baseQuery);
+
+      expect(result.data[0]).toMatchObject({ unitCost: null, markupPercentage: 50, salePrice: null });
+    });
+  });
+
+  describe('listCategories', () => {
+    it('returns distinct category names for the commerce', async () => {
+      vi.mocked(AppDataSource.query).mockResolvedValueOnce([{ category: 'Bebidas' }, { category: 'Lacteos' }]);
+
+      expect(await listCategories('commerce-uuid-1')).toEqual(['Bebidas', 'Lacteos']);
+      expect(vi.mocked(AppDataSource.query).mock.calls[0][1]).toEqual(['commerce-uuid-1']);
     });
   });
 
@@ -301,9 +347,8 @@ describe('catalog.service', () => {
       );
     });
   });
-  describe('markup in listing and detail', () => {
+  describe('markup in detail', () => {
     let rulesRepo: ReturnType<typeof createMockRepository>;
-    const baseQuery = { page: 1, limit: 20, sortOrder: 'ASC' as const, favoritesOnly: false };
 
     beforeEach(() => {
       rulesRepo = createMockRepository();
@@ -311,71 +356,6 @@ describe('catalog.service', () => {
       vi.mocked(AppDataSource.getRepository).mockImplementation(
         (entity) => (entity === MarkupRule ? rulesRepo : mockRepo) as never,
       );
-    });
-
-    it('should add markupPercentage and salePrice from the supplier rule', async () => {
-      mockQb.getManyAndCount.mockResolvedValue([[createSupplierProductFixture({ id: 'sp-1' })], 1]);
-      mockQb.getRawMany
-        .mockResolvedValueOnce([{ supplierProductId: 'sp-1', unitCost: '1000.00' }])
-        .mockResolvedValueOnce([]);
-      rulesRepo.find.mockResolvedValue([
-        createMarkupRuleFixture({ supplierId: 'supplier-uuid-1', markupPercentage: '30.00' }),
-      ]);
-
-      const result = await listProducts('commerce-uuid-1', baseQuery);
-
-      expect(result.data[0]).toMatchObject({
-        unitCost: '1000.00',
-        markupPercentage: 30,
-        salePrice: 1300,
-      });
-    });
-
-    it('should prefer the commerce_product rule of a linked product over the supplier rule', async () => {
-      mockQb.getManyAndCount.mockResolvedValue([[createSupplierProductFixture({ id: 'sp-1' })], 1]);
-      mockQb.getRawMany
-        .mockResolvedValueOnce([{ supplierProductId: 'sp-1', unitCost: '1000.00' }])
-        .mockResolvedValueOnce([]);
-      mockRepo.find.mockResolvedValue([
-        { supplierProductId: 'sp-1', commerceProductId: 'cp-1', isFavorite: true },
-      ]);
-      rulesRepo.find.mockResolvedValue([
-        createMarkupRuleFixture({ supplierId: 'supplier-uuid-1', markupPercentage: '30.00' }),
-        createMarkupRuleFixture({
-          scopeType: MarkupScopeType.COMMERCE_PRODUCT,
-          supplierId: null,
-          commerceProductId: 'cp-1',
-          markupPercentage: '40.00',
-        }),
-      ]);
-
-      const result = await listProducts('commerce-uuid-1', baseQuery);
-
-      expect(result.data[0]).toMatchObject({ markupPercentage: 40, salePrice: 1400, isFavorite: true });
-    });
-
-    it('should return null salePrice when there is no rule or no price', async () => {
-      mockQb.getManyAndCount.mockResolvedValue([
-        [createSupplierProductFixture({ id: 'sp-1' }), createSupplierProductFixture({ id: 'sp-2' })],
-        2,
-      ]);
-      mockQb.getRawMany
-        .mockResolvedValueOnce([{ supplierProductId: 'sp-1', unitCost: '1000.00' }])
-        .mockResolvedValueOnce([]);
-      rulesRepo.find.mockResolvedValue([
-        createMarkupRuleFixture({
-          scopeType: MarkupScopeType.SUPPLIER_PRODUCT,
-          supplierId: null,
-          supplierProductId: 'sp-2',
-          markupPercentage: '50.00',
-        }),
-      ]);
-
-      const result = await listProducts('commerce-uuid-1', baseQuery);
-
-      // sp-1 has a price but no rule; sp-2 has a rule but no price
-      expect(result.data[0]).toMatchObject({ markupPercentage: null, salePrice: null });
-      expect(result.data[1]).toMatchObject({ unitCost: null, markupPercentage: 50, salePrice: null });
     });
 
     it('should apply markup in getProduct', async () => {

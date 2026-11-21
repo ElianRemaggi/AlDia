@@ -7,6 +7,7 @@ import {
   Building2Icon,
   HomeIcon,
   LogOutIcon,
+  PackageIcon,
   TruckIcon,
   UsersIcon,
   type LucideIcon,
@@ -35,6 +36,7 @@ interface NavItem {
 const NAV: Record<"commerce" | "admin", NavItem[]> = {
   commerce: [
     { href: "/", label: "Inicio", icon: HomeIcon, exact: true },
+    { href: "/products", label: "Productos", icon: PackageIcon },
     { href: "/suppliers", label: "Proveedores", icon: TruckIcon },
   ],
   admin: [

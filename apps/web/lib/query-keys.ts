@@ -1,4 +1,4 @@
-import type { SupplierListParams, UserListParams } from "@/lib/api/endpoints";
+import type { ProductListParams, SupplierListParams, UserListParams } from "@/lib/api/endpoints";
 
 // Commerce-scoped data is keyed by the user's session (the API scopes by token),
 // and the whole cache is cleared on logout, so commerceId isn't part of the keys.
@@ -15,6 +15,15 @@ export const queryKeys = {
   priceLists: {
     bySupplier: (supplierId: string) => ["price-lists", supplierId] as const,
     list: (supplierId: string, params: object) => ["price-lists", supplierId, params] as const,
+  },
+  products: {
+    all: ["products"] as const,
+    lists: ["products", "list"] as const,
+    list: (params: ProductListParams) => ["products", "list", params] as const,
+    categories: ["products", "categories"] as const,
+    detail: (id: string) => ["products", "detail", id] as const,
+    history: (id: string) => ["products", "history", id] as const,
+    changes: (id: string) => ["products", "changes", id] as const,
   },
   importJobs: {
     detail: (id: string) => ["import-jobs", id] as const,

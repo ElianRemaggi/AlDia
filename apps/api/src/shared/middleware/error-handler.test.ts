@@ -3,6 +3,7 @@ import { AppError, errorHandler } from './error-handler';
 import { createMockRequest, createMockResponse, createMockNext } from '../../test/mocks/mock-express';
 import { Request, Response, NextFunction } from 'express';
 import { MulterError } from 'multer';
+import { QueryFailedError } from 'typeorm';
 import { z } from 'zod';
 
 describe('AppError', () => {
@@ -78,6 +79,16 @@ describe('errorHandler', () => {
       status: 'error',
       message: 'File too large. Maximum size is 20MB',
     });
+  });
+
+  it('should return 400 for malformed ids rejected by Postgres', () => {
+    const res = createMockResponse() as Response;
+    const err = new QueryFailedError('SELECT 1', [], Object.assign(new Error('invalid uuid'), { code: '22P02' }));
+
+    errorHandler(err, createMockRequest() as Request, res, createMockNext());
+
+    expect(res.status).toHaveBeenCalledWith(400);
+    expect(res.json).toHaveBeenCalledWith({ status: 'error', message: 'Invalid identifier' });
   });
 
   it('should return 400 for other multer errors', () => {

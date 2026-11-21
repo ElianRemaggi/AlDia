@@ -17,6 +17,12 @@ export async function listHandler(req: Request, res: Response): Promise<void> {
   res.json({ status: 'success', ...result });
 }
 
+export async function categoriesHandler(req: Request, res: Response): Promise<void> {
+  const commerceId = getCommerceId(req);
+  const categories = await catalogService.listCategories(commerceId);
+  res.json({ status: 'success', data: categories });
+}
+
 export async function getByIdHandler(req: Request, res: Response): Promise<void> {
   const commerceId = getCommerceId(req);
   const product = await catalogService.getProduct(req.params.id, commerceId);

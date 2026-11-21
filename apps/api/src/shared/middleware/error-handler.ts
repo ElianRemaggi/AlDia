@@ -1,5 +1,6 @@
 import { Request, Response, NextFunction } from 'express';
 import { MulterError } from 'multer';
+import { QueryFailedError } from 'typeorm';
 import { ZodError } from 'zod';
 
 export class AppError extends Error {
@@ -44,6 +45,12 @@ export const errorHandler = (
       status: 'error',
       message: tooLarge ? 'File too large. Maximum size is 20MB' : err.message,
     });
+    return;
+  }
+
+  // Postgres 22P02 (invalid_text_representation): e.g. a malformed UUID in the URL
+  if (err instanceof QueryFailedError && (err.driverError as { code?: string })?.code === '22P02') {
+    res.status(400).json({ status: 'error', message: 'Invalid identifier' });
     return;
   }
 

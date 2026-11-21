@@ -421,17 +421,39 @@ Soft delete: setea `isActive = false`. No elimina el registro.
 
 ---
 
-## Products — campos de precio
+## Products (catálogo)
 
-`GET /products` y `GET /products/:id` agregan a cada producto:
+Requiere usuario `commerce`. Todo se filtra por el `commerceId` del token.
+
+| Método | Ruta | Descripción |
+|--------|------|-------------|
+| GET | `/products` | Catálogo cross-supplier paginado |
+| GET | `/products/categories` | Categorías distintas de los productos activos (`string[]`) |
+| GET | `/products/:id` | Detalle con precio actual, markup y favorito |
+| GET | `/products/:id/price-history` | `price_list_items` del producto con su `priceList` (más nuevo primero) |
+| GET | `/products/:id/changes` | `price_change_events` del producto |
+| POST / DELETE | `/products/:id/favorite` | Marcar / desmarcar favorito |
+
+Un id con formato inválido devuelve `400 Invalid identifier`.
+
+### GET `/products`
+
+**Query params:** `page`, `limit` (máx 100), `search` (nombre o código, ILIKE), `supplierId` (uuid), `category`, `favoritesOnly=true`, `hasRecentChange=true` (precio cambió en los últimos 30 días), `sortBy` (`name` \| `price` \| `change`, default `name`), `sortOrder` (`ASC` \| `DESC`). Parámetros inválidos → `400`.
+
+Ordena en SQL (una sola query con `LATERAL` joins), así que el orden es correcto entre páginas; los productos sin precio / sin cambios van al final en ambas direcciones.
 
 | Campo | Tipo | Descripción |
 |-------|------|-------------|
-| `unitCost` | string \| null | Costo del proveedor según la última lista procesada |
-| `markupPercentage` | number \| null | Markup aplicado, resuelto por precedencia `supplier_product` → `commerce_product` (si el producto está vinculado) → `supplier`. `null` si no hay regla |
-| `salePrice` | number \| null | `unitCost × (1 + markupPercentage / 100)`, redondeado a 2 decimales. `null` si falta costo o regla |
-| `changePercentage` | string \| null | Último cambio de precio detectado |
-| `isFavorite` | boolean | Si el producto está marcado como favorito |
+| `supplier` | `{ id, name }` | Proveedor |
+| `unitCost` | string \| null | Costo según la lista procesada más nueva que incluye al producto |
+| `markupPercentage` | number \| null | Precedencia `supplier_product` → `commerce_product` (si está vinculado) → `supplier`. `null` sin regla |
+| `salePrice` | number \| null | `unitCost × (1 + markup/100)`, 2 decimales. `null` sin costo o regla |
+| `previousPrice` | string \| null | `oldPrice` del último cambio de precio |
+| `changePercentage` | string \| null | % del último cambio |
+| `lastChangeAt` | string \| null | Fecha del último cambio |
+| `isFavorite` | boolean | |
+
+`GET /products/:id` devuelve los mismos campos de precio (`unitCost`, `markupPercentage`, `salePrice`, `changePercentage`, `isFavorite`) más el `supplier` completo.
 
 ---
 

@@ -1,4 +1,3 @@
-import { In } from 'typeorm';
 import { AppDataSource } from '../../config/data-source';
 import { SupplierProduct } from '../import/entities/supplier-product.entity';
 import { PriceListItem } from '../import/entities/price-list-item.entity';
@@ -6,7 +5,6 @@ import { PriceChangeEvent } from '../import/entities/price-change-event.entity';
 import { CommerceProductSupplierLink } from '../commerce-product/entities/commerce-product-supplier-link.entity';
 import { AppError } from '../../shared/middleware';
 import { applyMarkup, listMarkupRules, pickMarkupRule } from '../markup/markup.service';
-import type { MarkupRule } from '../markup/entities/markup-rule.entity';
 import { ListProductsQuery } from './catalog.dto';
 
 const supplierProductRepo = () => AppDataSource.getRepository(SupplierProduct);
@@ -14,130 +12,149 @@ const priceListItemRepo = () => AppDataSource.getRepository(PriceListItem);
 const priceChangeEventRepo = () => AppDataSource.getRepository(PriceChangeEvent);
 const linkRepo = () => AppDataSource.getRepository(CommerceProductSupplierLink);
 
+/** A price change counts as "recent" for the hasRecentChange filter within this window. */
+export const RECENT_CHANGE_DAYS = 30;
+
+const PROCESSED_STATUSES = `'processed', 'partially_processed'`;
+
+// Whitelisted ORDER BY expressions (never interpolate user input into SQL).
+const SORT_COLUMNS = {
+  name: 'sp.name',
+  price: 'cur.unit_cost',
+  change: 'chg.change_percentage',
+} as const;
+
+interface ProductRow {
+  id: string;
+  supplier_id: string;
+  supplier_name: string;
+  supplier_product_code: string | null;
+  name: string;
+  description: string | null;
+  unit: string | null;
+  brand: string | null;
+  category: string | null;
+  unit_cost: string | null;
+  previous_price: string | null;
+  change_percentage: string | null;
+  last_change_at: Date | null;
+  is_favorite: boolean;
+  commerce_product_id: string | null;
+}
+
+/**
+ * Cross-supplier catalog with current price, latest change and favorite flag.
+ * One SQL query so sorting by price/change works across pages:
+ * - current price = item from the newest processed price list containing the product
+ * - latest change = newest price_change_event of the product
+ */
 export async function listProducts(commerceId: string, query: ListProductsQuery) {
-  const { page, limit, supplierId, category, search, favoritesOnly, sortOrder } = query;
+  const { page, limit, supplierId, category, search, favoritesOnly, hasRecentChange, sortBy, sortOrder } =
+    query;
 
-  const qb = supplierProductRepo()
-    .createQueryBuilder('sp')
-    .leftJoinAndSelect('sp.supplier', 'supplier')
-    .leftJoin(
-      'commerce_product_supplier_links',
-      'cpsl',
-      'cpsl.supplier_product_id = sp.id AND cpsl.commerce_id = :commerceId',
-      { commerceId },
-    )
-    .addSelect('cpsl.is_favorite', 'is_favorite')
-    .where('sp.commerce_id = :commerceId', { commerceId })
-    .andWhere('sp.is_active = true')
-    .orderBy('sp.name', sortOrder)
-    .skip((page - 1) * limit)
-    .take(limit);
+  const params: unknown[] = [commerceId];
+  const param = (value: unknown) => {
+    params.push(value);
+    return `$${params.length}`;
+  };
 
-  if (supplierId) {
-    qb.andWhere('sp.supplierId = :supplierId', { supplierId });
-  }
-
-  if (category) {
-    qb.andWhere('sp.category = :category', { category });
-  }
-
+  const where = ['sp.commerce_id = $1', 'sp.is_active = true'];
+  if (supplierId) where.push(`sp.supplier_id = ${param(supplierId)}`);
+  if (category) where.push(`sp.category = ${param(category)}`);
   if (search) {
-    qb.andWhere('sp.name ILIKE :search', { search: `%${search}%` });
+    const term = param(`%${search}%`);
+    where.push(`(sp.name ILIKE ${term} OR sp.supplier_product_code ILIKE ${term})`);
+  }
+  if (favoritesOnly) where.push('fav.is_favorite IS TRUE');
+  if (hasRecentChange) {
+    where.push(`chg.created_at >= now() - make_interval(days => ${RECENT_CHANGE_DAYS})`);
   }
 
-  if (favoritesOnly) {
-    qb.andWhere('cpsl.is_favorite = true');
-  }
+  const from = `
+    FROM supplier_products sp
+    JOIN suppliers s ON s.id = sp.supplier_id
+    LEFT JOIN LATERAL (
+      SELECT pli.unit_cost
+      FROM price_list_items pli
+      JOIN price_lists pl ON pl.id = pli.price_list_id AND pl.status IN (${PROCESSED_STATUSES})
+      WHERE pli.supplier_product_id = sp.id
+      ORDER BY pl.uploaded_at DESC
+      LIMIT 1
+    ) cur ON true
+    LEFT JOIN LATERAL (
+      SELECT pce.old_price, pce.change_percentage, pce.created_at
+      FROM price_change_events pce
+      WHERE pce.supplier_product_id = sp.id AND pce.commerce_id = $1
+      ORDER BY pce.created_at DESC
+      LIMIT 1
+    ) chg ON true
+    LEFT JOIN LATERAL (
+      SELECT bool_or(l.is_favorite) AS is_favorite,
+             (array_agg(l.commerce_product_id) FILTER (WHERE l.commerce_product_id IS NOT NULL))[1]
+               AS commerce_product_id
+      FROM commerce_product_supplier_links l
+      WHERE l.supplier_product_id = sp.id AND l.commerce_id = $1
+    ) fav ON true
+    WHERE ${where.join(' AND ')}`;
 
-  const [products, total] = await qb.getManyAndCount();
+  // Copy: LIMIT/OFFSET params get appended to `params` for the rows query below.
+  const [{ total }] = await AppDataSource.query(`SELECT count(*)::int AS total ${from}`, [...params]);
 
-  // Enrich each product with current price and latest change
-  const productIds = products.map((p) => p.id);
+  const direction = sortOrder === 'DESC' ? 'DESC' : 'ASC';
+  const rows: ProductRow[] = await AppDataSource.query(
+    `SELECT sp.id, sp.supplier_id, s.name AS supplier_name, sp.supplier_product_code, sp.name,
+            sp.description, sp.unit, sp.brand, sp.category,
+            cur.unit_cost,
+            chg.old_price AS previous_price, chg.change_percentage, chg.created_at AS last_change_at,
+            coalesce(fav.is_favorite, false) AS is_favorite, fav.commerce_product_id
+     ${from}
+     ORDER BY ${SORT_COLUMNS[sortBy]} ${direction} NULLS LAST, sp.name ASC, sp.id ASC
+     LIMIT ${param(limit)} OFFSET ${param((page - 1) * limit)}`,
+    params,
+  );
 
-  const unitCostMap = new Map<string, string>();
-  const changeMap = new Map<string, string>();
-  const favoriteMap = new Map<string, boolean>();
-  const commerceProductMap = new Map<string, string>();
-  let rules: MarkupRule[] = [];
+  const rules = rows.length > 0 ? await listMarkupRules(commerceId) : [];
 
-  if (productIds.length > 0) {
-    // Current prices: latest price_list_item from latest processed price_list per product
-    const priceRows = await priceListItemRepo()
-      .createQueryBuilder('pli')
-      .innerJoin('pli.priceList', 'pl', "pl.status IN ('processed', 'partially_processed')")
-      .select('pli.supplierProductId', 'supplierProductId')
-      .addSelect('pli.unitCost', 'unitCost')
-      .where('pli.supplierProductId IN (:...ids)', { ids: productIds })
-      .orderBy('pl.uploadedAt', 'DESC')
-      .getRawMany();
-
-    // Keep only the first (latest) row per product
-    for (const row of priceRows) {
-      if (!unitCostMap.has(row.supplierProductId)) {
-        unitCostMap.set(row.supplierProductId, row.unitCost);
-      }
-    }
-
-    // Latest change percentage per product
-    const changeRows = await priceChangeEventRepo()
-      .createQueryBuilder('pce')
-      .select('pce.supplierProductId', 'supplierProductId')
-      .addSelect('pce.changePercentage', 'changePercentage')
-      .where('pce.supplierProductId IN (:...ids) AND pce.commerceId = :commerceId', {
-        ids: productIds,
-        commerceId,
-      })
-      .orderBy('pce.createdAt', 'DESC')
-      .getRawMany();
-
-    for (const row of changeRows) {
-      if (!changeMap.has(row.supplierProductId)) {
-        changeMap.set(row.supplierProductId, row.changePercentage);
-      }
-    }
-
-    // Links: favorite flag + linked commerce product (needed for commerce_product markup rules)
-    const links = await linkRepo().find({
-      where: { commerceId, supplierProductId: In(productIds) },
-    });
-    for (const link of links) {
-      favoriteMap.set(
-        link.supplierProductId,
-        (favoriteMap.get(link.supplierProductId) ?? false) || link.isFavorite,
-      );
-      if (link.commerceProductId) {
-        commerceProductMap.set(link.supplierProductId, link.commerceProductId);
-      }
-    }
-
-    rules = await listMarkupRules(commerceId);
-  }
-
-  const data = products.map((p) => {
-    const unitCost = unitCostMap.get(p.id) ?? null;
+  const data = rows.map((row) => {
     const rule = pickMarkupRule(rules, {
-      supplierId: p.supplierId,
-      supplierProductId: p.id,
-      commerceProductId: commerceProductMap.get(p.id),
+      supplierId: row.supplier_id,
+      supplierProductId: row.id,
+      commerceProductId: row.commerce_product_id,
     });
     return {
-      ...p,
-      unitCost,
-      ...applyMarkup(unitCost, rule),
-      changePercentage: changeMap.get(p.id) ?? null,
-      isFavorite: favoriteMap.get(p.id) ?? false,
+      id: row.id,
+      supplierId: row.supplier_id,
+      supplier: { id: row.supplier_id, name: row.supplier_name },
+      supplierProductCode: row.supplier_product_code,
+      name: row.name,
+      description: row.description,
+      unit: row.unit,
+      brand: row.brand,
+      category: row.category,
+      unitCost: row.unit_cost,
+      ...applyMarkup(row.unit_cost, rule),
+      previousPrice: row.previous_price,
+      changePercentage: row.change_percentage,
+      lastChangeAt: row.last_change_at,
+      isFavorite: row.is_favorite,
     };
   });
 
   return {
     data,
-    meta: {
-      total,
-      page,
-      limit,
-      totalPages: Math.ceil(total / limit),
-    },
+    meta: { total, page, limit, totalPages: Math.ceil(total / limit) },
   };
+}
+
+/** Distinct categories of the commerce's active products, for the catalog filter. */
+export async function listCategories(commerceId: string): Promise<string[]> {
+  const rows: { category: string }[] = await AppDataSource.query(
+    `SELECT DISTINCT category FROM supplier_products
+     WHERE commerce_id = $1 AND is_active = true AND category IS NOT NULL AND category <> ''
+     ORDER BY category`,
+    [commerceId],
+  );
+  return rows.map((r) => r.category);
 }
 
 export async function getProduct(id: string, commerceId: string) {

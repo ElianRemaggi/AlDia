@@ -415,11 +415,12 @@ Las páginas se construyen **en orden de disponibilidad de la API**:
 - Verificado con Playwright + pipeline real (API + worker Python + Redis): Excel ok, CSV parcial, archivo roto, drag & drop, proveedor inactivo.
 - `next.config.ts`: `experimental.proxyClientMaxBodySize: "25mb"` — el rewrite cortaba los uploads en 10MB.
 
-### Fase F3 — Con API Paso 4 (Catálogo completo)
-- [ ] `/products` — tabla con todos los filtros
-- [ ] Toggle favorito con optimistic update
-- [ ] `/products/:id` — detalle + gráfico historial
-- [ ] Tab "Productos" en `/suppliers/:id`
+### Fase F3 — ✅ Implementada (2026-11-20)
+- [x] `/products` — búsqueda (nombre o código), proveedor, categoría, solo favoritos, con cambios recientes; orden por nombre / costo / % de cambio (headers con `aria-sort`); costo, precio de venta (+markup) y último cambio (↑ rojo / ↓ verde, con flecha y signo)
+- [x] Favorito con optimistic update (todas las listas en cache + detalle; rollback si falla)
+- [x] `/products/:id` — costo, precio de venta, último cambio; gráfico del costo (step line SVG propio, crosshair con mouse y flechas, tooltip `aria-live`); tabla de historial como vista tabular
+- [x] Sección "Productos" en `/suppliers/:id` (misma tabla con el proveedor fijo)
+- Color de la serie: `--series-1` en `globals.css` (validado con el checker de dataviz contra las cards clara y oscura). Va **dentro** de los bloques `:root` / `.dark` del tema: agregado al final del archivo no llegaba al CSS compilado.
 
 ### Fase F4 — Con API Paso 5 (Compras + Notificaciones)
 - [ ] `/purchase-lists` — lista y creación

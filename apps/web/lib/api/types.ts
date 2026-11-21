@@ -79,3 +79,55 @@ export interface ImportJob {
   /** Set by the API when the import completes. */
   metaJson: { parser?: string; total_rows?: number; error_count?: number } | null;
 }
+
+export interface ProductListItem {
+  id: string;
+  supplierId: string;
+  supplier: { id: string; name: string };
+  supplierProductCode: string | null;
+  name: string;
+  description: string | null;
+  unit: string | null;
+  brand: string | null;
+  category: string | null;
+  /** Cost from the supplier's newest processed list. Decimal as string. */
+  unitCost: string | null;
+  markupPercentage: number | null;
+  salePrice: number | null;
+  previousPrice: string | null;
+  changePercentage: string | null;
+  lastChangeAt: string | null;
+  isFavorite: boolean;
+}
+
+export interface ProductDetail {
+  id: string;
+  supplierId: string;
+  supplier: Supplier;
+  supplierProductCode: string | null;
+  name: string;
+  description: string | null;
+  unit: string | null;
+  brand: string | null;
+  category: string | null;
+  unitCost: string | null;
+  markupPercentage: number | null;
+  salePrice: number | null;
+  changePercentage: string | null;
+  isFavorite: boolean;
+}
+
+/** One price_list_item of the product, with its price list. */
+export interface PriceHistoryEntry {
+  id: string;
+  unitCost: string;
+  priceList: Pick<PriceList, "id" | "versionNumber" | "uploadedAt" | "effectiveDate" | "sourceFileName">;
+}
+
+export interface PriceChange {
+  id: string;
+  oldPrice: string;
+  newPrice: string;
+  changePercentage: string;
+  createdAt: string;
+}
